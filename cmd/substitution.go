@@ -26,30 +26,38 @@ func substitutionShell(cmd *cobra.Command, args []string) {
 	for {
 		plainString := ""
 		for _, cipherByte := range []byte(cipherString) {
-	     if isUppercaseAscii(cipherByte) {
-				 plainByte, solved := cipherToPlain[cipherByte]
-				 if solved {
-					 plainString += string(plainByte)
-				 } else {
-					 plainString += "_"
-				 }
-			 } else {
-				 plainString += string(cipherByte)
-			 }
+			if isUppercaseAscii(cipherByte) {
+				plainByte, solved := cipherToPlain[cipherByte]
+				if solved {
+					plainString += string(plainByte)
+				} else {
+					plainString += "_"
+				}
+			} else {
+				plainString += string(cipherByte)
+			}
 		}
 
 		fmt.Println(cipherString)
 		fmt.Println(plainString)
 
-    fmt.Print("? ")
+		fmt.Print("? ")
 		command, _ := reader.ReadString('\n')
 		commandAsBytes := []byte(command)
 
 		if substitutionCommand.Match(commandAsBytes) {
-			  // 0 will be cipher character, 1 will be = and 2 will be plaintext
-        cipherToPlain[commandAsBytes[0]] = commandAsBytes[2]
-				continue
+			// 0 will be cipher character, 1 will be = and 2 will be plaintext
+			cipherToPlain[commandAsBytes[0]] = commandAsBytes[2]
+			continue
 		}
 	}
+
+}
+
+// substitutionSolve uses a dictionary file to create possible matches for a substitution string.
+// For each word in the string, the function finds a set of cryptographic matches. Then it tries
+// combinations of those strings, updating a dictionary as it goes and rejecting possibilities
+// where the dictionary conflicts.
+func substitutionSolve(cmd *cobra.Command, args []string) {
 
 }

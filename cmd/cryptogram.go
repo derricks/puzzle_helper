@@ -40,8 +40,8 @@ var freqCmd = &cobra.Command{
 	Run:   printFrequencyTable,
 }
 
-var substitutionCmd = &cobra.Command {
-	Use: "substitution",
+var substitutionCmd = &cobra.Command{
+	Use:   "substitution",
 	Short: "Tools for dealing with simple substitution ciphers",
 }
 
@@ -49,7 +49,7 @@ var substitutionReplCmd = &cobra.Command{
 	Use:   "repl",
 	Short: "Creates an interactive session for solving substitution ciphers",
 	Args:  cobra.MinimumNArgs(1),
-	Run: substitutionShell,
+	Run:   substitutionShell,
 }
 
 func init() {
@@ -68,7 +68,6 @@ func init() {
 	// is called directly, e.g.:
 	// cryptogramCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
-
 
 // printFrequencyTable generates output about the frequency of characters, digraphs, and trigraphs in a string
 func printFrequencyTable(cmd *cobra.Command, args []string) {

@@ -16,7 +16,10 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -29,7 +32,7 @@ var cryptogramCmd = &cobra.Command{
 	Long: `The cryptogram subcommand is designed to help with puzzle-level cryptanalysis.
 
 	Examples:
-	   puzzles cryptogram freq `,
+	   puzzles cryptogram freq TEXT: `,
 }
 
 var freqCmd = &cobra.Command{
@@ -40,8 +43,16 @@ var freqCmd = &cobra.Command{
 	Run:   printFrequencyTable,
 }
 
+var interactSubstitution = &cobra.Command{
+	Use:   "interact-substitution",
+	Short: "Creates an interactive session for solving substitution ciphers",
+	Args:  cobra.MinimumNArgs(1),
+	Run: substitutionShell,
+}
+
 func init() {
 	cryptogramCmd.AddCommand(freqCmd)
+	cryptogramCmd.AddCommand(interactSubstitution)
 	rootCmd.AddCommand(cryptogramCmd)
 
 	// Here you will define your flags and configuration settings.
@@ -53,6 +64,49 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// cryptogramCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+var substitutionCommand = regexp.MustCompile("[A-Z]=[a-z]")
+
+// substitutionShell creates a loop which lets you interactively solve a substitution cipher.
+// It will prompt for commands and show the current state of cipher text and plain text.
+// Command reference:
+//   A=z will replace A in ciphertext with a z in plaintext
+func substitutionShell(cmd *cobra.Command, args []string) {
+	cipherString := strings.Join(args, " ")
+	cipherToPlain := make(map[byte]byte)
+
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		plainString := ""
+		for _, cipherByte := range []byte(cipherString) {
+	     if isUppercaseAscii(cipherByte) {
+				 plainByte, solved := cipherToPlain[cipherByte]
+				 if solved {
+					 plainString += string(plainByte)
+				 } else {
+					 plainString += "_"
+				 }
+			 } else {
+				 plainString += string(cipherByte)
+			 }
+		}
+
+		fmt.Println(cipherString)
+		fmt.Println(plainString)
+
+    fmt.Print("? ")
+		command, _ := reader.ReadString('\n')
+		commandAsBytes := []byte(command)
+
+		if substitutionCommand.Match(commandAsBytes) {
+			  // 0 will be cipher character, 1 will be = and 2 will be plaintext
+        cipherToPlain[commandAsBytes[0]] = commandAsBytes[2]
+				continue
+		}
+	}
+
 }
 
 // printFrequencyTable generates output about the frequency of characters, digraphs, and trigraphs in a string

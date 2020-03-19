@@ -23,6 +23,8 @@ import (
 )
 
 // cryptogramCmd represents the cryptogram command
+var dictionaryFile string
+
 var cryptogramCmd = &cobra.Command{
 	Use:   "cryptogram",
 	Short: "Provides a variety of tools for doing cryptanalyis",
@@ -52,8 +54,23 @@ var substitutionReplCmd = &cobra.Command{
 	Run:   substitutionShell,
 }
 
+var substitutionSolveCmd = &cobra.Command{
+	Use:   "solve",
+	Short: "Uses a dictionary file to solve a string of (alpha only) words",
+	Long: `
+	Given a dictionary file, this command will find matches of the cryptographic pattern and will
+	use those hits to find sets of letter combinations that will allow the words to be solved into
+	words in the dictionary.
+	`,
+	Run: substitutionSolve,
+}
+
 func init() {
 	substitutionCmd.AddCommand(substitutionReplCmd)
+	substitutionSolveCmd.Flags().StringVarP(&dictionaryFile, "dictionary", "d", "", "Dictionary file to use, or - to use stdin")
+	substitutionSolveCmd.MarkFlagRequired("dictionary")
+	substitutionCmd.AddCommand(substitutionSolveCmd)
+
 	cryptogramCmd.AddCommand(freqCmd)
 	cryptogramCmd.AddCommand(substitutionCmd)
 	rootCmd.AddCommand(cryptogramCmd)

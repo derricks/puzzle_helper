@@ -59,5 +59,74 @@ func substitutionShell(cmd *cobra.Command, args []string) {
 // combinations of those strings, updating a dictionary as it goes and rejecting possibilities
 // where the dictionary conflicts.
 func substitutionSolve(cmd *cobra.Command, args []string) {
+	// the user could pass in "abcd efg" rather than ABCD EFG, so clean up the data
+	oneString := strings.ToUpper(strings.Join(args, " "))
+	matchesData := buildSubstitutionData(oneString, dictionaryFile)
 
+	// sort such that items with shorter lists are evaluated first to prune earlier
+	sort.Slice(matchesData, func(i, j int) bool {
+		return len(matchesData[i].patternMatches) < len(matchesData[j].patternMatches)
+	})
+
+	validMaps := collectValidMaps(matchesData, make(map[byte]byte))
+	for _, curMap := range validMaps {
+		printDecodedString(oneString, curMap)
+	}
+}
+
+// printDecodedString uses cipherToPlain to decode cipherText
+func printDecodedString(cipherText string, cipherToPlain map[byte]byte) {
+	for _, cipherChar := range []byte(cipherText) {
+		plainChar, mapped := cipherToPlain[cipherChar]
+		if !mapped {
+			fmt.Printf("%c", cipherChar)
+		} else {
+			fmt.Printf("%c", plainChar)
+		}
+	}
+	fmt.Print("\n")
+}
+
+// collectValidMaps builds a slice of valid byte -> byte mappings that work for all the
+// matches it's looked at so far. this method is called  recursively to build the list
+func collectValidMaps(matches []*substitutionWordMatches, currentMap map[byte]byte) []map[byte]byte {
+	if len(matches) == 0 {
+		// we've reached the end of the matches to check, which means the currentMap is valid
+		return []map[byte]byte{currentMap}
+	}
+
+	if len(matches[0].patternMatches) == 0 {
+		// no matches were found for this word
+		return make([]map[byte]byte, 0)
+	}
+
+	results := make([]map[byte]byte, 0)
+	for _, currentMatch := range matches[0].patternMatches {
+		copyMap := copyByteMap(currentMap)
+		matchBytes := []byte(currentMatch)
+		// now edit the map based on the letters in matches[0].word
+		// for a given byte in word, check to see the corresponding byte in
+		// currentMatch. If that mapping is not in copyMap, add it. If the mapping
+		// is in copyMap and is the same, keep going. Finally, if the mapping is in copyMap
+		// but maps to a different byte, flag the word as not a match
+
+		allBytesWorked := true
+		for index, cryptByte := range []byte(matches[0].word) {
+			plainTextByte, exists := copyMap[cryptByte]
+			if !exists {
+				copyMap[cryptByte] = matchBytes[index]
+			} else {
+				if plainTextByte != matchBytes[index] {
+					allBytesWorked = false
+					break
+				}
+			}
+		}
+
+		if !allBytesWorked {
+			// move on to the next word; this one didn't work
+			continue
+		}
+
+	}
 }

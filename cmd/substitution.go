@@ -121,9 +121,6 @@ func collectValidMaps(matches []*substitutionWordMatches, currentMap map[byte]by
 		// is in copyMap and is the same, keep going. Finally, if the mapping is in copyMap
 		// but maps to a different byte, flag the word as not a match
 
-		// create a copy of the map just for this word, so we can unwind it if something
-		// in the plaintext word doesn't work (rather than have some entries made even
-		// though the word as a whole didn't work)
 		allBytesWorked := true
 		for index, cryptByte := range []byte(matches[0].word) {
 			plainTextByte, exists := copyMap[cryptByte]

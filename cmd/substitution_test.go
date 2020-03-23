@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -65,9 +66,12 @@ func TestCollectValidMaps(test *testing.T) {
 		&substitutionWordMatches{"TIZP", "ABCD", make([]string, 0, 2)},
 	}
 
+	resultsChannel := make(chan map[byte]byte, 1)
 	dictionary := "WILLING\nPEOPLE\nSOME"
 	findMatchesFromDictionary(matchesData, bufio.NewReader(strings.NewReader(dictionary)))
-	byteMap := collectValidMaps(matchesData, make(map[byte]byte))[0]
+	collectValidMaps(matchesData, make(map[byte]byte), resultsChannel)
+	byteMap := <-resultsChannel
+	close(resultsChannel)
 
 	expectedMap := map[byte]byte{
 		'B': 'W',
@@ -88,6 +92,7 @@ func TestCollectValidMaps(test *testing.T) {
 		}
 	}
 
+	// test length from different dictionaries
 	testCases := map[string]int{
 		"BOSOMY\nHELLFIRE\nCRUTCH":                     0,
 		"WILLING\nPEOPLE\nSOME\nSUCCUMB\nTHATCH\nGASH": 2,
@@ -99,7 +104,22 @@ func TestCollectValidMaps(test *testing.T) {
 		}
 
 		findMatchesFromDictionary(matchesData, bufio.NewReader(strings.NewReader(testDict)))
-		byteMaps := collectValidMaps(matchesData, make(map[byte]byte))
+
+		resultsChannel = make(chan map[byte]byte)
+
+		var waitGroup sync.WaitGroup
+		waitGroup.Add(1)
+		go func() {
+			collectValidMaps(matchesData, make(map[byte]byte), resultsChannel)
+			waitGroup.Done()
+		}()
+		close(resultsChannel)
+
+		byteMaps := make([]map[byte]byte, expectedLength)
+		for validMap := range resultsChannel {
+			byteMaps = append(byteMaps, validMap)
+		}
+
 		if len(byteMaps) != expectedLength {
 			test.Errorf("Expected %d item map from %s, but it was %d items", expectedLength, testDict, len(byteMaps))
 			for _, curMap := range byteMaps {

@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -79,10 +81,28 @@ func substitutionSolve(cmd *cobra.Command, args []string) {
 		return len(matchesData[i].patternMatches) < len(matchesData[j].patternMatches)
 	})
 
-	validMaps := collectValidMaps(matchesData, make(map[byte]byte))
-	for _, curMap := range validMaps {
-		printDecodedString(oneString, curMap)
-	}
+	resultsChannel := make(chan map[byte]byte)
+	go func() {
+		for validMap := range resultsChannel {
+			printDecodedString(oneString, validMap)
+		}
+	}()
+	partitionMapCollection(matchesData, resultsChannel)
+	// ensure the channel has time to be cleared
+	time.Sleep(2 * time.Second)
+}
+
+// partitionMapCollection splits up matchesData so that the work can
+// be partitioned among goroutines that push their results to resultsChannel.
+// it returns when waitGroup.Wait() finishes.
+func partitionMapCollection(matchData []*substitutionWordMatches, resultsChannel chan map[byte]byte) {
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(1)
+	go func(matches []*substitutionWordMatches, currentMap map[byte]byte) {
+		collectValidMaps(matchData, currentMap, resultsChannel)
+		waitGroup.Done()
+	}(matchData, make(map[byte]byte))
+	waitGroup.Wait()
 }
 
 // printDecodedString uses cipherToPlain to decode cipherText
@@ -100,18 +120,18 @@ func printDecodedString(cipherText string, cipherToPlain map[byte]byte) {
 
 // collectValidMaps builds a slice of valid byte -> byte mappings that work for all the
 // matches it's looked at so far. this method is called  recursively to build the list
-func collectValidMaps(matches []*substitutionWordMatches, currentMap map[byte]byte) []map[byte]byte {
+func collectValidMaps(matches []*substitutionWordMatches, currentMap map[byte]byte, resultsChannel chan map[byte]byte) {
 	if len(matches) == 0 {
 		// we've reached the end of the matches to check, which means the currentMap is valid
-		return []map[byte]byte{currentMap}
+		resultsChannel <- currentMap
+		return
 	}
 
 	if len(matches[0].patternMatches) == 0 {
 		// no matches were found for this word
-		return make([]map[byte]byte, 0)
+		return
 	}
 
-	results := make([]map[byte]byte, 0)
 	for _, currentMatch := range matches[0].patternMatches {
 		copyMap := copyByteMap(currentMap)
 		matchBytes := []byte(currentMatch)
@@ -141,10 +161,8 @@ func collectValidMaps(matches []*substitutionWordMatches, currentMap map[byte]by
 
 		// at this point, every byte in the current match doesn't conflict with the existing byte map, so we can gather up the results
 		// from the recursive call
-		deeperResults := collectValidMaps(matches[1:], copyMap)
-		results = append(results, deeperResults...)
+		collectValidMaps(matches[1:], copyMap, resultsChannel)
 	}
-	return results
 }
 
 // copyByteMap allows the solving code to make a copy of the current byte map so it can pop old copies

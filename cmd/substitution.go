@@ -14,7 +14,7 @@ import (
 )
 
 // Implementations for the substitution command object
-var substitutionCommand = regexp.MustCompile("[A-Z]=[a-z]")
+var substitutionCommand = regexp.MustCompile("[A-Z]=[a-z_]")
 
 // substitutionShell creates a loop which lets you interactively solve a substitution cipher.
 // It will prompt for commands and show the current state of cipher text and plain text.
@@ -50,7 +50,11 @@ func substitutionShell(cmd *cobra.Command, args []string) {
 
 		if substitutionCommand.Match(commandAsBytes) {
 			// 0 will be cipher character, 1 will be = and 2 will be plaintext
-			cipherToPlain[commandAsBytes[0]] = commandAsBytes[2]
+			if commandAsBytes[2] == '_' {
+				delete(cipherToPlain,commandAsBytes[0])
+			} else {
+				cipherToPlain[commandAsBytes[0]] = commandAsBytes[2]
+			}
 			continue
 		}
 	}

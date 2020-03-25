@@ -16,17 +16,68 @@ import (
 // Implementations for the substitution command object
 var substitutionCommand = regexp.MustCompile("[A-Z]=[a-z_]")
 
+type KeyDisplay int
+
+const (
+	cipher2Plain KeyDisplay = iota
+	plain2Cipher
+)
+
+const (
+	cipher2PlainCommand string = "cipher2Plain"
+	plain2CipherCommand string = "plain2Cipher"
+	clearCommand string = "clear"
+)
+
 // substitutionShell creates a loop which lets you interactively solve a substitution cipher.
 // It will prompt for commands and show the current state of cipher text and plain text.
 // Command reference:
 //   A=z will replace A in ciphertext with a z in plaintext
+//   cipher2Plain will list the cipher key in alphabetical order with the plain key underneath
+//   plain2Cipher will list the plain key in alphabetical order with the cipher key underneath
+//   clear will remove any mappings
 func substitutionShell(cmd *cobra.Command, args []string) {
 	cipherString := strings.Join(args, " ")
+	displayType := cipher2Plain
+
 	cipherToPlain := make(map[byte]byte)
+	plainToCipher := make(map[byte]byte)
 
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
+		cipherKeyBytes := make([]byte, 0, 26)
+		plainKeyBytes := make([]byte, 0, 26)
+		switch displayType {
+		case cipher2Plain:
+			for curByte := byte('A'); curByte <= byte('Z'); curByte = byte(curByte + 1) {
+				cipherKeyBytes = append(cipherKeyBytes, curByte)
+				plainChar, mapped := cipherToPlain[curByte]
+				if mapped {
+					plainKeyBytes = append(plainKeyBytes, plainChar)
+				} else {
+					plainKeyBytes = append(plainKeyBytes, '_')
+				}
+			}
+			fmt.Println(string(cipherKeyBytes))
+			fmt.Println(string(plainKeyBytes))
+		case plain2Cipher:
+			for curByte := byte('a'); curByte <= byte('z'); curByte = byte(curByte + 1) {
+				plainKeyBytes = append(plainKeyBytes, curByte)
+				cipherChar, mapped := plainToCipher[curByte]
+				if mapped {
+					cipherKeyBytes = append(cipherKeyBytes, cipherChar)
+				} else {
+					cipherKeyBytes = append(cipherKeyBytes, '?')
+				}
+			}
+			fmt.Println(string(plainKeyBytes))
+			fmt.Println(string(cipherKeyBytes))
+		default:
+			// shouldn't get here
+			fmt.Printf("Unknown display type: %v\n", displayType)
+		}
+
 		plainString := ""
 		for _, cipherByte := range []byte(cipherString) {
 			if isUppercaseAscii(cipherByte) {
@@ -46,16 +97,25 @@ func substitutionShell(cmd *cobra.Command, args []string) {
 
 		fmt.Print("? ")
 		command, _ := reader.ReadString('\n')
+		command = strings.TrimSpace(command)
 		commandAsBytes := []byte(command)
-
 		if substitutionCommand.Match(commandAsBytes) {
 			// 0 will be cipher character, 1 will be = and 2 will be plaintext
 			if commandAsBytes[2] == '_' {
-				delete(cipherToPlain,commandAsBytes[0])
+				// deleting from the plainToCipher map means figuring out the current cipherToPlain mapping
+				delete(plainToCipher, cipherToPlain[commandAsBytes[0]])
+				delete(cipherToPlain, commandAsBytes[0])
 			} else {
 				cipherToPlain[commandAsBytes[0]] = commandAsBytes[2]
+				plainToCipher[commandAsBytes[2]] = commandAsBytes[0]
 			}
-			continue
+		} else if command == cipher2PlainCommand {
+			displayType = cipher2Plain
+		} else if command == plain2CipherCommand {
+			displayType = plain2Cipher
+		} else if command == clearCommand {
+			cipherToPlain = make(map[byte]byte)
+			plainToCipher = make(map[byte]byte)
 		}
 	}
 

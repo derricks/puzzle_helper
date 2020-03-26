@@ -39,6 +39,53 @@ func TestFindMatchesFromDictionary(test *testing.T) {
 	}
 }
 
+type partitionTest struct {
+	count                 int
+	expectedMatchesAtZero []string
+}
+
+func stringInSlice(seek string, stringSlice []string) bool {
+	for _, curString := range stringSlice {
+		if seek == curString {
+			return true
+		}
+	}
+	return false
+}
+
+func TestPartitionMatches(test *testing.T) {
+	data := &substitutionWordMatches{"HELLO", "ABCCD", []string{"YUCCA", "WATTS", "VROOM", "VILLA", "SWEET"}}
+
+	tests := []partitionTest{
+		partitionTest{5, []string{"YUCCA"}},
+		partitionTest{1, []string{"YUCCA", "WATTS", "VROOM", "VILLA", "SWEET"}},
+		partitionTest{2, []string{"YUCCA", "VROOM", "SWEET"}},
+	}
+
+	for index, curTest := range tests {
+		partitioned := partitionMatches(curTest.count, data)
+
+		if len(partitioned) != curTest.count {
+			test.Errorf("Test case %v: expected %v partitions but got %v", index, curTest.count, len(partitioned))
+		}
+
+		// verify matches are what's expected
+		if len(partitioned[0].patternMatches) != len(curTest.expectedMatchesAtZero) {
+			test.Errorf("Test case %d: Expected partition 0 to have %d items but had %d",
+				index, len(curTest.expectedMatchesAtZero), len(partitioned[0].patternMatches))
+		}
+
+		for _, expectToFind := range curTest.expectedMatchesAtZero {
+			if !stringInSlice(expectToFind, partitioned[0].patternMatches) {
+				test.Errorf("Test case %d: Expected to find %s in %v but did not",
+					index, expectToFind, partitioned[0].patternMatches)
+			}
+		}
+
+	}
+
+}
+
 func TestCopyByteMap(test *testing.T) {
 	source := map[byte]byte{
 		'A': 'B',

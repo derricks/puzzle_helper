@@ -24,6 +24,7 @@ import (
 
 // cryptogramCmd represents the cryptogram command
 var dictionaryFile string
+var concurrency int
 
 var cryptogramCmd = &cobra.Command{
 	Use:   "cryptogram",
@@ -76,6 +77,7 @@ func init() {
 	substitutionCmd.AddCommand(substitutionReplCmd)
 	substitutionSolveCmd.Flags().StringVarP(&dictionaryFile, "dictionary", "d", "", "Dictionary file to use, or - to use stdin")
 	substitutionSolveCmd.MarkFlagRequired("dictionary")
+	substitutionSolveCmd.Flags().IntVarP(&concurrency, "concurrency", "c", 10, "The maximum goroutines to create for solving. Defaults to 10.")
 	substitutionCmd.AddCommand(substitutionSolveCmd)
 
 	cryptogramCmd.AddCommand(freqCmd)

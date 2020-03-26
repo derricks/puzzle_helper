@@ -26,7 +26,7 @@ const (
 const (
 	cipher2PlainCommand string = "cipher2Plain"
 	plain2CipherCommand string = "plain2Cipher"
-	clearCommand string = "clear"
+	clearCommand        string = "clear"
 )
 
 // substitutionShell creates a loop which lets you interactively solve a substitution cipher.
@@ -37,6 +37,11 @@ const (
 //   plain2Cipher will list the plain key in alphabetical order with the cipher key underneath
 //   clear will remove any mappings
 func substitutionShell(cmd *cobra.Command, args []string) {
+	// whether to overwrite the text on the screen (will usually be true)
+	// or just push lines onto the screen
+	overwrite := false
+	outWriter := bufio.NewWriter(os.Stdout)
+
 	cipherString := strings.Join(args, " ")
 	displayType := cipher2Plain
 
@@ -46,6 +51,13 @@ func substitutionShell(cmd *cobra.Command, args []string) {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
+		if overwrite {
+			outWriter.Write([]byte("\u001b[6A"))
+			outWriter.Write([]byte("\u001b[100D"))
+		} else {
+			outWriter.Write([]byte{'\n'})
+		}
+
 		cipherKeyBytes := make([]byte, 0, 26)
 		plainKeyBytes := make([]byte, 0, 26)
 		switch displayType {
@@ -59,8 +71,7 @@ func substitutionShell(cmd *cobra.Command, args []string) {
 					plainKeyBytes = append(plainKeyBytes, '_')
 				}
 			}
-			fmt.Println(string(cipherKeyBytes))
-			fmt.Println(string(plainKeyBytes))
+			writeLines(outWriter, string(cipherKeyBytes), string(plainKeyBytes))
 		case plain2Cipher:
 			for curByte := byte('a'); curByte <= byte('z'); curByte = byte(curByte + 1) {
 				plainKeyBytes = append(plainKeyBytes, curByte)
@@ -71,12 +82,13 @@ func substitutionShell(cmd *cobra.Command, args []string) {
 					cipherKeyBytes = append(cipherKeyBytes, '?')
 				}
 			}
-			fmt.Println(string(plainKeyBytes))
-			fmt.Println(string(cipherKeyBytes))
+			writeLines(outWriter, string(plainKeyBytes), string(cipherKeyBytes))
 		default:
 			// shouldn't get here
+			writeLines(outWriter)
 			fmt.Printf("Unknown display type: %v\n", displayType)
 		}
+		writeLines(outWriter, "")
 
 		plainString := ""
 		for _, cipherByte := range []byte(cipherString) {
@@ -92,10 +104,11 @@ func substitutionShell(cmd *cobra.Command, args []string) {
 			}
 		}
 
-		fmt.Println(cipherString)
-		fmt.Println(plainString)
+		writeLines(outWriter, cipherString, plainString)
 
-		fmt.Print("? ")
+		outWriter.Write([]byte("? "))
+		outWriter.Write([]byte("\u001b[0K"))
+		outWriter.Flush()
 		command, _ := reader.ReadString('\n')
 		command = strings.TrimSpace(command)
 		commandAsBytes := []byte(command)
@@ -117,8 +130,17 @@ func substitutionShell(cmd *cobra.Command, args []string) {
 			cipherToPlain = make(map[byte]byte)
 			plainToCipher = make(map[byte]byte)
 		}
-	}
 
+		overwrite = true
+	}
+}
+
+func writeLines(writer *bufio.Writer, lines ...string) {
+	for _, line := range lines {
+		writer.Write([]byte(line))
+		writer.Write([]byte{'\n'})
+	}
+	writer.Flush()
 }
 
 type substitutionWordMatches struct {

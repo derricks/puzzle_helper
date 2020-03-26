@@ -24,3 +24,7 @@ Commands:
 Given a dictionary file, attempt to find a set of cribs that matches the ciphertext.
 
     ./puzzle_helper cryptogram substitution solve string1 [string2...] --dictionary path_to_dictionary_file
+
+The `solve` command will attempt to solve the set of strings concurrently. You can configure the number of goroutines that will get made for parallel solving with the --concurrency argument (default is 10):
+
+    ./puzzle_helper cryptogram substitution solve string1 [string2...] --dictionary path_to_dictionary_file -concurrency 2

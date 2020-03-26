@@ -182,13 +182,56 @@ func substitutionSolve(cmd *cobra.Command, args []string) {
 // be partitioned among goroutines that push their results to resultsChannel.
 // it returns when waitGroup.Wait() finishes.
 func partitionMapCollection(matchData []*substitutionWordMatches, resultsChannel chan map[byte]byte) {
+
+	// build partitioned slices of substitutionWordMatches objects off of the first one
+	// in the list. The matches in the head of the group will be split up to create
+	// an object with a smaller set of matches that can be put into a goroutine
+	// in other words:
+	//    if the word matches for item 0 are HELLO and BOSSY, you'll end up with one slice
+	//      where the first item only has HELLO as a match and another slice where the first
+	//      item only has BOSSY as a match. Then the solution trees are independent
+	partitionCount := concurrency
+
+	if len(matchData[0].patternMatches) < concurrency {
+		partitionCount = len(matchData[0].patternMatches)
+	}
+
 	var waitGroup sync.WaitGroup
-	waitGroup.Add(1)
-	go func(matches []*substitutionWordMatches, currentMap map[byte]byte) {
-		collectValidMaps(matchData, currentMap, resultsChannel)
-		waitGroup.Done()
-	}(matchData, make(map[byte]byte))
+	heads := partitionMatches(partitionCount, matchData[0])
+	for _, curHead := range heads {
+
+		// build up the new set of substitutionWordMatches with this head (and its map of partitions)
+		// as the first one
+		newMatchData := make([]*substitutionWordMatches, 0, len(matchData))
+		newMatchData = append(newMatchData, curHead)
+		newMatchData = append(newMatchData, matchData[1:]...)
+
+		waitGroup.Add(1)
+		go func(matches []*substitutionWordMatches, currentMap map[byte]byte) {
+			collectValidMaps(matchData, currentMap, resultsChannel)
+			waitGroup.Done()
+		}(newMatchData, make(map[byte]byte))
+	}
 	waitGroup.Wait()
+}
+
+// partitionMatches creates count new *substitutionWordMatches where each
+// contains a subset of the source's patternMatches object. This allows solve efforts
+// to be parallelized
+func partitionMatches(count int, source *substitutionWordMatches) []*substitutionWordMatches {
+	partitions := make([]*substitutionWordMatches, 0, count)
+
+	// create the initial set, with no pattern matches
+	for index := 0; index < count; index++ {
+		partitions = append(partitions, &substitutionWordMatches{source.word, source.cryptPattern, make([]string, 0, 1)})
+	}
+
+	// now populate the patternMatches for a given return struct by modding the index
+	for index, curMatch := range source.patternMatches {
+		curPartition := partitions[index%count]
+		curPartition.patternMatches = append(curPartition.patternMatches, curMatch)
+	}
+	return partitions
 }
 
 // printDecodedString uses cipherToPlain to decode cipherText

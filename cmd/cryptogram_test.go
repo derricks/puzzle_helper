@@ -21,6 +21,22 @@ func TestIsUppercaseAscii(test *testing.T) {
 	}
 }
 
+func TestIsLowercaseAscii(test *testing.T) {
+	expectedResults := map[byte]bool{
+		'a': true,
+		'A': false,
+		'z': true,
+		'{': false,
+		'`': false,
+	}
+
+	for toTest, expected := range expectedResults {
+		if isLowercaseAscii(toTest) != expected {
+			test.Errorf("Expected isLowercaseAscii(%c) to return %v but it returned %v", toTest, expected, isLowercaseAscii(toTest))
+		}
+	}
+}
+
 func TestFrequencyCountsInString(test *testing.T) {
 	tests := map[string]map[byte]int{
 		"D'M D'LL": map[byte]int{'D': 2, 'M': 1, 'L': 2, byte(39): 0, ' ': 0},

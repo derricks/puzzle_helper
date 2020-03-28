@@ -24,3 +24,7 @@ Commands:
 Given a dictionary file, attempt to find a set of cribs that matches the ciphertext.
 
     ./puzzle_helper cryptogram substitution solve string1 [string2...] --dictionary path_to_dictionary_file
+
+Given a set of strings, print out the caesar shifts of those strings
+
+    ./puzzle_helper cryptogram caesar string1 [string2...]

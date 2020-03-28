@@ -65,6 +65,13 @@ var substitutionSolveCmd = &cobra.Command{
 	Run: substitutionSolve,
 }
 
+var caesarCmd = &cobra.Command{
+	Use:   "caesar",
+	Short: "Print out caesar shifts of all the words in the arguments",
+	Args:  cobra.MinimumNArgs(1),
+	Run:   printCaesarShifts,
+}
+
 func init() {
 	substitutionCmd.AddCommand(substitutionReplCmd)
 	substitutionSolveCmd.Flags().StringVarP(&dictionaryFile, "dictionary", "d", "", "Dictionary file to use, or - to use stdin")
@@ -73,6 +80,7 @@ func init() {
 
 	cryptogramCmd.AddCommand(freqCmd)
 	cryptogramCmd.AddCommand(substitutionCmd)
+	cryptogramCmd.AddCommand(caesarCmd)
 	rootCmd.AddCommand(cryptogramCmd)
 
 	// Here you will define your flags and configuration settings.
@@ -130,4 +138,8 @@ func frequencyCountInString(toCount string) map[byte]int {
 
 func isUppercaseAscii(check byte) bool {
 	return check >= 65 && check < 91
+}
+
+func isLowercaseAscii(check byte) bool {
+	return check >= 97 && check < 123
 }

@@ -16,9 +16,11 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/spf13/cobra"
 	"os"
+	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -62,6 +64,7 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -88,4 +91,39 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+// feedDictionaryPaths takes a set of file paths (or - for stdin) and reads through
+// each one, feeding it to the channel. Many of the puzzle types this helps with need
+// to read from a dictionary file, so this creates a simple reusable pattern that
+// any solving functionality can use.
+func feedDictionaryPaths(feed chan string, files ...string) {
+	readers := make([]*bufio.Reader, 0, len(files))
+	for _, file := range files {
+		if file == "-" {
+			readers = append(readers, bufio.NewReader(os.Stdin))
+		} else {
+			file, err := os.Open(file)
+			if err != nil {
+				fmt.Printf("Could not access file: %v\n", err)
+				os.Exit(1)
+			}
+			defer file.Close()
+			readers = append(readers, bufio.NewReader(file))
+		}
+	}
+	feedDictionaryReaders(feed, readers...)
+}
+
+// feedDictionaryReaders reads from readers and pushes strings to the feed,
+// closing it when it's done. This is separated out from above largely to
+// facilitate testing.
+func feedDictionaryReaders(feed chan string, readers ...*bufio.Reader) {
+	for _, reader := range readers {
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			feed <- strings.ToUpper(scanner.Text())
+		}
+	}
+	close(feed)
 }

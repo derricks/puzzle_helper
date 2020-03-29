@@ -28,7 +28,12 @@ func TestFindMatchesFromDictionary(test *testing.T) {
 	}
 
 	dictionary := "BLEED\nWHEESES\nBOLT\nBOSSY"
-	findMatchesFromDictionary(matchesData, bufio.NewReader(strings.NewReader(dictionary)))
+	dictChannel := make(chan string)
+	go func() {
+		feedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(dictionary)))
+	}()
+
+	findMatchesFromDictionary(matchesData, dictChannel)
 
 	if len(matchesData[0].patternMatches) != 2 {
 		test.Errorf("Expected HELLO to have 2 matches, but it had %v", len(matchesData[0].patternMatches))
@@ -115,7 +120,11 @@ func TestCollectValidMaps(test *testing.T) {
 
 	resultsChannel := make(chan map[byte]byte, 1)
 	dictionary := "WILLING\nPEOPLE\nSOME"
-	findMatchesFromDictionary(matchesData, bufio.NewReader(strings.NewReader(dictionary)))
+	dictChannel := make(chan string)
+	go func() {
+		feedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(dictionary)))
+	}()
+	findMatchesFromDictionary(matchesData, dictChannel)
 	collectValidMaps(matchesData, make(map[byte]byte), resultsChannel)
 	byteMap := <-resultsChannel
 	close(resultsChannel)
@@ -149,8 +158,11 @@ func TestCollectValidMaps(test *testing.T) {
 		for _, match := range matchesData {
 			match.patternMatches = make([]string, 0, 2)
 		}
-
-		findMatchesFromDictionary(matchesData, bufio.NewReader(strings.NewReader(testDict)))
+		dictChannel := make(chan string)
+		go func() {
+			feedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(testDict)))
+		}()
+		findMatchesFromDictionary(matchesData, dictChannel)
 
 		resultsChannel = make(chan map[byte]byte)
 

@@ -314,36 +314,19 @@ func buildSubstitutionData(solveString, dictionaryFile string) []*substitutionWo
 		wordMatches = append(wordMatches, &substitutionWordMatches{curWord, substitutionPattern(curWord), make([]string, 0, 1)})
 	}
 
-	// for each line in the input, see if its pattern equals any pattern in the list
-	// if so, add it to the list of matches
-	var input *bufio.Reader
-	var err error
-	if dictionaryFile == "-" {
-		input = bufio.NewReader(os.Stdin)
-	} else {
-		file, err := os.Open(dictionaryFile)
-		if err != nil {
-			fmt.Printf("Could not access file: %v\n", err)
-			os.Exit(1)
-		}
-		defer file.Close()
-		input = bufio.NewReader(file)
-	}
+	results := make(chan string)
+	go func() {
+		feedDictionaryPaths(results, dictionaryFile)
+	}()
 
-	err = findMatchesFromDictionary(wordMatches, input)
-	if err != nil {
-		fmt.Printf("Error accessing dictionary: %v\n", err)
-		os.Exit(1)
-	}
+	findMatchesFromDictionary(wordMatches, results)
 	return wordMatches
 }
 
 // findMatchesFromDictionary populates each item in substitutionWordMatches with matching
 // entries from the passed-in Reader. This mutates the structures that are passed in
-func findMatchesFromDictionary(matchSets []*substitutionWordMatches, reader *bufio.Reader) error {
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		entry := strings.ToUpper(scanner.Text())
+func findMatchesFromDictionary(matchSets []*substitutionWordMatches, feed chan string) {
+	for entry := range feed {
 		pattern := substitutionPattern(entry)
 		for _, testMatch := range matchSets {
 			if testMatch.cryptPattern == pattern {
@@ -351,11 +334,6 @@ func findMatchesFromDictionary(matchSets []*substitutionWordMatches, reader *buf
 			}
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-	return nil
 }
 
 // substitutionPattern takes in a string and creates the pattern of its letters.

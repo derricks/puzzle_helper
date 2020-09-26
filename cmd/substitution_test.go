@@ -3,8 +3,8 @@ package cmd
 import (
 	"bufio"
 	"strings"
-	"sync"
 	"testing"
+	"time"
 )
 
 func TestSubstitutionPattern(test *testing.T) {
@@ -149,6 +149,7 @@ func TestCollectValidMaps(test *testing.T) {
 	}
 
 	// test length from different dictionaries
+
 	testCases := map[string]int{
 		"BOSOMY\nHELLFIRE\nCRUTCH":                     0,
 		"WILLING\nPEOPLE\nSOME\nSUCCUMB\nTHATCH\nGASH": 2,
@@ -158,25 +159,25 @@ func TestCollectValidMaps(test *testing.T) {
 		for _, match := range matchesData {
 			match.patternMatches = make([]string, 0, 2)
 		}
+		resultsChannel := make(chan map[byte]byte)
 		dictChannel := make(chan string)
 		go func() {
 			feedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(testDict)))
 		}()
 		findMatchesFromDictionary(matchesData, dictChannel)
+		go collectValidMaps(matchesData, make(map[byte]byte), resultsChannel)
 
-		resultsChannel = make(chan map[byte]byte)
-
-		var waitGroup sync.WaitGroup
-		waitGroup.Add(1)
-		go func() {
-			collectValidMaps(matchesData, make(map[byte]byte), resultsChannel)
-			waitGroup.Done()
-		}()
-		close(resultsChannel)
-
-		byteMaps := make([]map[byte]byte, expectedLength)
-		for validMap := range resultsChannel {
-			byteMaps = append(byteMaps, validMap)
+		byteMaps := make([]map[byte]byte, 0, expectedLength)
+	Loop:
+		for {
+			select {
+			case validMap := <-resultsChannel:
+				if len(validMap) > 0 {
+					byteMaps = append(byteMaps, validMap)
+				}
+			case <-time.After(2 * time.Second):
+				break Loop
+			}
 		}
 
 		if len(byteMaps) != expectedLength {

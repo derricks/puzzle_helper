@@ -23,7 +23,6 @@ import (
 )
 
 // cryptogramCmd represents the cryptogram command
-var dictionaryFile string
 var concurrency int
 
 var cryptogramCmd = &cobra.Command{

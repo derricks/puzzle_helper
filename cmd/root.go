@@ -18,15 +18,21 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
+	"regexp"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var cfgFile string
+
+// enough of these commands use a dictionary file that we can declare it at the top level
+var dictionaryFile string
+
+var lettersRegex = regexp.MustCompile("[A-Za-z]")
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -126,4 +132,15 @@ func feedDictionaryReaders(feed chan string, readers ...*bufio.Reader) {
 		}
 	}
 	close(feed)
+}
+
+// dictionaryChanToTrie will read the dictionary channel populated by feedDictionaryReaders
+// and will add the items to a Trie structure that it will return
+func readDictionaryToTrie(dictionary chan string) *trieNode {
+	newTrie := newTrie()
+	for entry := range dictionary {
+		// something needs to be the value or else nodes will get ignored in walks
+		newTrie.addString(entry)
+	}
+	return newTrie
 }

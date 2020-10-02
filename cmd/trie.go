@@ -8,6 +8,7 @@ import (
 
 type trieNode struct {
 	letter   string
+	value    interface{}
 	children map[string]*trieNode
 }
 
@@ -16,7 +17,7 @@ func newTrie() *trieNode {
 }
 
 func newTrieWithLetter(letter string) *trieNode {
-	return &trieNode{letter, make(map[string]*trieNode)}
+	return &trieNode{letter, nil, make(map[string]*trieNode)}
 }
 
 func (node *trieNode) addString(input string) {
@@ -38,6 +39,41 @@ func (node *trieNode) addString(input string) {
 	childNode.addString(tail)
 }
 
+func (node *trieNode) addStringWithValue(input string, value interface{}) {
+	node.addString(input)
+	node.setValueForString(input, value)
+}
+
+// setValueForString puts the given value at the correct spot in the trie. It assumes
+// the string is already in the trie! if a string is not in the trie, use addStringWithValue
+func (node *trieNode) setValueForString(input string, value interface{}) {
+	if input == "" {
+		node.value = value
+		return
+	}
+  head := input[0:1]
+	node.children[head].setValueForString(input[1:], value)
+}
+
+// getValueForString retrieves the value set for the string. It does not assume
+// the string is in the trie; it will return nil, false if the string wasn't there
+func (node *trieNode) getValueForString(input string) (interface{}, bool) {
+	if input == "" {
+		return node.value, true
+	}
+
+	head := input[0:1]
+	tail := input[1:]
+
+	childNode, isPresent := node.children[head]
+	if !isPresent {
+		// can't continue this string in the trie
+		return nil, false
+	}
+
+	return childNode.getValueForString(tail)
+}
+
 func (node *trieNode) String() string {
-	return fmt.Sprintf("%s: [%v]", node.letter, node.children)
+	return fmt.Sprintf("%s (%s): [%v]", node.letter, node.value, node.children)
 }

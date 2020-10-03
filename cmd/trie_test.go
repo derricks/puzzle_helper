@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 )
 
 func TestAdds(test *testing.T) {
@@ -45,4 +46,39 @@ func TestAddingRetrieving(test *testing.T) {
 			test.Errorf("Test case %d: Expected value of %v but got %v", index, testCase.value, value)
 		}
 	}
+}
+
+func TestIterateWords(test *testing.T) {
+	tests := map[string]int{
+		"stringing": 123,
+		"string":    456,
+	}
+
+	trie := newTrie()
+	for testWord, testValue := range tests {
+		trie.addStringWithValue(testWord, testValue)
+	}
+
+	words := make(chan trieWord)
+	timer := time.NewTimer(1 * time.Second)
+
+	go trie.feedWordsToChannel(words)
+	select {
+	case foundTrieWord := <-words:
+		testCount, wasPresent := tests[foundTrieWord.word]
+		if !wasPresent {
+			test.Errorf("Channel put out a word that's not in test case: %s", foundTrieWord.word)
+		}
+
+		if testCount != foundTrieWord.value {
+			test.Errorf("Expected count of %d for %s but got %d", testCount, foundTrieWord.word, foundTrieWord.value)
+		}
+		delete(tests, foundTrieWord.word)
+	case _ = <-timer.C:
+		if len(tests) != 0 {
+			test.Errorf("Tests should be empty but had %d items in it", len(tests))
+		}
+		break
+	}
+	close(words)
 }

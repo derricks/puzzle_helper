@@ -51,7 +51,7 @@ func (node *trieNode) setValueForString(input string, value interface{}) {
 		node.value = value
 		return
 	}
-  head := input[0:1]
+	head := input[0:1]
 	node.children[head].setValueForString(input[1:], value)
 }
 
@@ -72,6 +72,26 @@ func (node *trieNode) getValueForString(input string) (interface{}, bool) {
 	}
 
 	return childNode.getValueForString(tail)
+}
+
+type trieWord struct {
+	word  string
+	value interface{}
+}
+
+func (node *trieNode) feedWordsToChannel(channel chan trieWord) {
+	node.recursiveFindWords("", channel)
+}
+
+func (node *trieNode) recursiveFindWords(currentWord string, channel chan trieWord) {
+	for letter, child := range node.children {
+		if letter == "" {
+			channel <- trieWord{currentWord, node.value}
+			continue
+		}
+
+		child.recursiveFindWords(currentWord+letter, channel)
+	}
 }
 
 func (node *trieNode) String() string {

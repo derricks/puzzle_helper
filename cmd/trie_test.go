@@ -80,5 +80,4 @@ func TestIterateWords(test *testing.T) {
 		}
 		break
 	}
-	close(words)
 }

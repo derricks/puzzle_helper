@@ -21,6 +21,8 @@ func newTrieWithLetter(letter string) *trieNode {
 }
 
 func (node *trieNode) addString(input string) {
+
+	// if the value is there already, you're done
 	if input == "" {
 		// mark a word boundary
 		node.children[""] = newTrie()
@@ -81,6 +83,7 @@ type trieWord struct {
 
 func (node *trieNode) feedWordsToChannel(channel chan trieWord) {
 	node.recursiveFindWords("", channel)
+	close(channel)
 }
 
 func (node *trieNode) recursiveFindWords(currentWord string, channel chan trieWord) {

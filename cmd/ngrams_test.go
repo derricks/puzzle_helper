@@ -40,3 +40,44 @@ func TestNgramScanner(test *testing.T) {
 
 	}
 }
+
+func TestReadNgramsIntoTrie(test *testing.T) {
+	input := "attack a Tacky Norse horse"
+	expectedCounts := map[string]int{
+		"ATTA": 1,
+		"TTAC": 1,
+		"TACK": 2,
+		"ACKA": 1,
+		"CKAT": 1,
+		"KATA": 1,
+		"ATAC": 1,
+		"ACKY": 1,
+		"CKYN": 1,
+		"KYNO": 1,
+		"YNOR": 1,
+		"NORS": 1,
+		"ORSE": 2,
+		"RSEH": 1,
+		"SEHO": 1,
+		"EHOR": 1,
+		"HORS": 1,
+	}
+
+	trie, totalCount := readNgramsIntoTrie(strings.NewReader(input), 4)
+
+	if totalCount != 19 {
+		test.Errorf("Expected 19 total count, got %d", totalCount)
+	}
+
+	for ngram, expectedCount := range expectedCounts {
+		actualCount, wasPresent := trie.getValueForString(ngram)
+		if !wasPresent {
+			test.Errorf("Expected ngram %s in trie, but it was absent", ngram)
+		}
+
+		if actualCount != expectedCount {
+			test.Errorf("Expected count of %d for %s but got %d", expectedCount, ngram, actualCount)
+		}
+	}
+
+}

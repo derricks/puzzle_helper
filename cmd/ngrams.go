@@ -57,19 +57,50 @@ func outputNgrams(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	readNgramsIntoTrie(inReader)
-	// set up corpus and a trie
-	// split into ngrams
-	// for each ngram
-	//    if it's in the trie, add 1
-	//    if it's not in the trie, set to 1
-	// keep a total count
-	// output ngram\tfrequence
+	var outWriter io.Writer
+	if outputFileName == "" {
+		outWriter = os.Stdout
+	} else {
+		var err error
+		outWriter, err = os.Create(outputFileName)
+		if err != nil {
+			fmt.Printf("Could not open %s for writing: %v", outputFileName, err)
+			os.Exit(1)
+		}
+	}
+
+	trie, totalCount := readNgramsIntoTrie(inReader, ngramLength)
+	triePairs := make(chan trieWord)
+	go trie.feedWordsToChannel(triePairs)
+	for pair := range triePairs {
+
+		_, err := outWriter.Write([]byte(fmt.Sprintf("%s\t%f\n", pair.word, float64(pair.value.(int))/float64(totalCount))))
+		if err != nil {
+			fmt.Println("Could not write to file: %v", err)
+			os.Exit(1)
+		}
+	}
 }
 
-func readNgramsIntoTrie(io.Reader) *trieNode {
+func readNgramsIntoTrie(inReader io.Reader, ngramSize int) (*trieNode, int) {
 	trie := newTrie()
-	return trie
+	scanner := NewNgramScanner(inReader, ngramSize)
+	totalNGrams := 0
+
+	for scanner.Scan() {
+		if scanner.Err() != nil {
+			fmt.Printf("Scanning error: %v\n", scanner.Err())
+		}
+		totalNGrams += 1
+		currentNgram := scanner.Text()
+		currentCount, nGramPresent := trie.getValueForString(currentNgram)
+		if !nGramPresent {
+			trie.addStringWithValue(currentNgram, 1)
+		} else {
+			trie.setValueForString(currentNgram, currentCount.(int)+1)
+		}
+	}
+	return trie, totalNGrams
 }
 
 // ngramScanner is a Scanner implementation that returns subsequent chunks

@@ -74,7 +74,7 @@ func outputNgrams(cmd *cobra.Command, args []string) {
 	go trie.feedWordsToChannel(triePairs)
 	for pair := range triePairs {
 
-		_, err := outWriter.Write([]byte(fmt.Sprintf("%s\t%f\n", pair.word, float64(pair.value.(int))/float64(totalCount))))
+		_, err := outWriter.Write([]byte(fmt.Sprintf("%s\t%.16f\n", pair.word, float64(pair.value.(int))/float64(totalCount))))
 		if err != nil {
 			fmt.Printf("Could not write to file: %v\n", err)
 			os.Exit(1)

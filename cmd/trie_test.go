@@ -48,6 +48,18 @@ func TestAddingRetrieving(test *testing.T) {
 	}
 }
 
+func TestGetSize(test *testing.T) {
+	trie := newTrie()
+	trie.addString("hello")
+	trie.addString("hell")
+	trie.addString("he")
+	trie.addString("goodbye")
+	actualSize := trie.getSize()
+	if actualSize != 4 {
+		test.Errorf("Expected trie size of 4 but got %d", actualSize)
+	}
+}
+
 func TestIterateWords(test *testing.T) {
 	tests := map[string]int{
 		"stringing": 123,

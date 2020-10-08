@@ -41,6 +41,17 @@ func (node *trieNode) addString(input string) {
 	childNode.addString(tail)
 }
 
+// getSize returns the number of items in the trie
+func (node *trieNode) getSize() int {
+	size := 0
+	wordChannel := make(chan trieWord)
+	go node.feedWordsToChannel(wordChannel)
+	for _ = range wordChannel {
+		size++
+	}
+	return size
+}
+
 func (node *trieNode) addStringWithValue(input string, value interface{}) {
 	node.addString(input)
 	node.setValueForString(input, value)

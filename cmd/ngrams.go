@@ -76,7 +76,7 @@ func outputNgrams(cmd *cobra.Command, args []string) {
 
 		_, err := outWriter.Write([]byte(fmt.Sprintf("%s\t%f\n", pair.word, float64(pair.value.(int))/float64(totalCount))))
 		if err != nil {
-			fmt.Println("Could not write to file: %v", err)
+			fmt.Printf("Could not write to file: %v\n", err)
 			os.Exit(1)
 		}
 	}

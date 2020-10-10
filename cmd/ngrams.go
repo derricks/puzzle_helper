@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"io"
+	"math"
 	"os"
 )
 
@@ -34,7 +35,8 @@ var ngramsCmd = &cobra.Command{
 	Short: "Given a corpus of text, generate ngrams of the specified length",
 	Long: `This command won't be used very often, but the output can feed in to hillclimbing strategies for cryptogram solving.
 
-	The output is ngram, tab, frequency within corpus. So ATTA\t.022 means that the ATTA tetragram occurred in .022 (2.2%) of the corpus`,
+	The output is ngram, tab, log10(frequency within corpus).
+	`,
 	Run: outputNgrams,
 }
 
@@ -74,7 +76,7 @@ func outputNgrams(cmd *cobra.Command, args []string) {
 	go trie.feedWordsToChannel(triePairs)
 	for pair := range triePairs {
 
-		_, err := outWriter.Write([]byte(fmt.Sprintf("%s\t%.16f\n", pair.word, float64(pair.value.(int))/float64(totalCount))))
+		_, err := outWriter.Write([]byte(fmt.Sprintf("%s\t%.16f\n", pair.word, math.Log10(float64(pair.value.(int))/float64(totalCount)))))
 		if err != nil {
 			fmt.Printf("Could not write to file: %v\n", err)
 			os.Exit(1)

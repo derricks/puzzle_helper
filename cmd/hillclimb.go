@@ -19,7 +19,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"math"
 	"math/rand"
 	"os"
 	"sort"
@@ -30,7 +29,7 @@ import (
 )
 
 var ngramFrequencyFile string
-var iterations int
+var generations int
 var ngramSize int
 var mutations int
 var regenAfter int
@@ -109,47 +108,38 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 
 	justCipherText := strings.Join(justLetters, "")
 
-	startingCandidate := &substitutionHillclimbCandidate{math.MinInt64, nil}
-	// pick a reasonable start
-	for i := 0; i < localLookaround; i++ {
-		testStartingCandidate := newHillclimbCandidate(generateRandomKey(), justCipherText, trie)
-		if testStartingCandidate.fitness > startingCandidate.fitness {
-			startingCandidate = testStartingCandidate
-		}
-	}
-
-	currentCandidate := startingCandidate
-	currentBestCandidate := currentCandidate
-	candidates = append(candidates, currentBestCandidate)
+	currentCandidate := newHillclimbCandidate(generateRandomKey(), justCipherText, trie)
+	bestOfGeneration := currentCandidate
+	candidates = append(candidates, bestOfGeneration)
 
 	fitnessGenerations := 1
-	for count := 0; count < iterations; count++ {
-		if currentCandidate.fitness > currentBestCandidate.fitness {
-			currentBestCandidate = currentCandidate
-			fmt.Printf("New best at iteration %d: %.8f\n%v\n%s\n\n", count, currentCandidate.fitness, currentCandidate.key, decipherStringFromKey(justCipherText, currentCandidate.key))
+	currentGeneration := 1
+	for currentGeneration <= generations {
+		if currentCandidate.fitness > bestOfGeneration.fitness {
+			bestOfGeneration = currentCandidate
 			fitnessGenerations = 0
 
 			if len(candidates) < candidateCount {
-				candidates = append(candidates, currentBestCandidate)
+				candidates = append(candidates, bestOfGeneration)
 				sort.Sort(candidates)
 			} else {
 				currentLastPlace := candidates[len(candidates)-1]
-				if currentBestCandidate.fitness > currentLastPlace.fitness {
-					candidates[len(candidates)-1] = currentBestCandidate
+				if bestOfGeneration.fitness > currentLastPlace.fitness {
+					candidates[len(candidates)-1] = bestOfGeneration
 					sort.Sort(candidates)
 				}
 			}
 
 		} else {
 			fitnessGenerations++
-			// go back to the previous best
-			currentCandidate = currentBestCandidate
 		}
 
 		// we've gone too long without finding a better fitness
 		if fitnessGenerations > regenAfter {
-			currentCandidate = newHillclimbCandidate(generateRandomKey(), justCipherText, trie)
+			bestOfGeneration = newHillclimbCandidate(generateRandomKey(), justCipherText, trie)
+			currentCandidate = bestOfGeneration
 			fitnessGenerations = 0
+			currentGeneration++
 			continue
 		}
 
@@ -200,7 +190,7 @@ func calculateNgramFitness(deciphered string, trie *trieNode) float64 {
 		if isPresent {
 			fitness += log10probability.(float64)
 		} else {
-			fitness += -100
+			fitness += -1000
 		}
 	}
 	return fitness
@@ -252,11 +242,11 @@ func generateRandomKey() map[string]string {
 func init() {
 	hillclimbCmd.Flags().StringVarP(&ngramFrequencyFile, "frequency-file", "f", "", "the path to the frequency file to use. Use - for stdin. The chunking of the input text will use the same ngram size from the first line of the file, and the file is assumed to be ngram tab log10 of frequency")
 	hillclimbCmd.MarkFlagRequired("frequency-file")
-	hillclimbCmd.Flags().IntVarP(&iterations, "iterations", "i", 1000, "the number of iterations to apply the hill-climbing algorithm for")
-	hillclimbCmd.Flags().IntVarP(&mutations, "mutations", "m", 3, "the number of mutations to do on the key during each iteration")
-	hillclimbCmd.Flags().IntVarP(&regenAfter, "regen-after", "r", 50, "how long a fitness can survive before the program starts with a new random key")
+	hillclimbCmd.Flags().IntVarP(&generations, "generations", "g", 50, "the number of generations to run for - generations happen based on the regen-after setting")
+	hillclimbCmd.Flags().IntVarP(&mutations, "mutations", "m", 1, "the number of mutations to do on the key during each iteration")
+	hillclimbCmd.Flags().IntVarP(&regenAfter, "regen-after", "r", 1000, "how long a fitness can survive before the program starts with a new random key")
 	hillclimbCmd.Flags().IntVarP(&candidateCount, "candidates", "c", 10, "the number of top performing candidates to display")
-	hillclimbCmd.Flags().IntVarP(&localLookaround, "local-lookaround", "l", 100, "when picking a new path, evaluate this many local candidates and choose the best of them")
+	hillclimbCmd.Flags().IntVarP(&localLookaround, "local-lookaround", "l", 1, "when picking a new path, evaluate this many local candidates and choose the best of them")
 	substitutionCmd.AddCommand(hillclimbCmd)
 
 	// Here you will define your flags and configuration settings.

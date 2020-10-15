@@ -126,6 +126,7 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 	for count := 0; count < iterations; count++ {
 		if currentCandidate.fitness > currentBestCandidate.fitness {
 			currentBestCandidate = currentCandidate
+			fmt.Printf("New best at iteration %d: %.8f\n%v\n%s\n\n", count, currentCandidate.fitness, currentCandidate.key, decipherStringFromKey(justCipherText, currentCandidate.key))
 			fitnessGenerations = 0
 
 			if len(candidates) < candidateCount {

@@ -21,6 +21,7 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
+	"runtime/pprof"
 	"strings"
 	"time"
 
@@ -30,6 +31,13 @@ import (
 )
 
 var cfgFile string
+
+var profile bool
+var cpuFilePath = "cpu.prof"
+var memFilePath = "mem.prof"
+
+var cpuFile *os.File
+var memFile *os.File
 
 // enough of these commands use a dictionary file that we can declare it at the top level
 var dictionaryFile string
@@ -46,9 +54,30 @@ examples and usage of using your application. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	//	Run: func(cmd *cobra.Command, args []string) { },
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if profile {
+			cpuFile, err := os.Create(cpuFilePath)
+			if err != nil {
+				fmt.Printf("Could not open %s: %v\n", cpuFilePath, err)
+				os.Exit(1)
+			}
+
+			memFile, err = os.Create(memFilePath)
+			if err != nil {
+				fmt.Printf("Could not open %s: %v\n", memFilePath, err)
+				os.Exit(1)
+			}
+
+			pprof.StartCPUProfile(cpuFile)
+		}
+	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		if profile {
+			cpuFile.Close()
+			memFile.Close()
+			pprof.StopCPUProfile()
+		}
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -65,11 +94,8 @@ func init() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.puzzle_helper.yaml)")
+	rootCmd.PersistentFlags().BoolVarP(&profile, "profile", "", false, "turn on profiling for this run")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

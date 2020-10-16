@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 )
 
 // Implements a basic trie system, which ends up being by used by a number of word puzzles
@@ -71,20 +72,15 @@ func (node *trieNode) setValueForString(input string, value interface{}) {
 // getValueForString retrieves the value set for the string. It does not assume
 // the string is in the trie; it will return nil, false if the string wasn't there
 func (node *trieNode) getValueForString(input string) (interface{}, bool) {
-	if input == "" {
-		return node.value, true
+	childNode := node
+	isPresent := false
+	for _, curChar := range strings.Split(input, "") {
+		childNode, isPresent = childNode.children[curChar]
+		if !isPresent {
+			return nil, false
+		}
 	}
-
-	head := input[0:1]
-	tail := input[1:]
-
-	childNode, isPresent := node.children[head]
-	if !isPresent {
-		// can't continue this string in the trie
-		return nil, false
-	}
-
-	return childNode.getValueForString(tail)
+	return childNode.value, true
 }
 
 type trieWord struct {

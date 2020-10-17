@@ -73,7 +73,7 @@ func findTransposals(cmd *cobra.Command, args []string) {
 // results are written to the solutions channel
 func recursiveFindTransposals(rootTrie *trieNode, currentTrie *trieNode, letterCounts map[string]int, currentWordList []string, currentWord string, solutions chan []string) {
 	// we have no more letters and we're at a word break
-	if len(letterCounts) == 0 && (currentTrie.atWordBoundary || currentTrie == nil) {
+	if len(letterCounts) == 0 && (currentTrie.atWordBoundary) {
 		// make a copy to avoid messing with the slice
 		finalWordList := make([]string, 0, len(currentWordList)+1)
 		finalWordList = append(finalWordList, currentWordList...)
@@ -94,19 +94,23 @@ func recursiveFindTransposals(rootTrie *trieNode, currentTrie *trieNode, letterC
 		if childTrie == nil {
 			continue
 		}
-		childLetter := string(index + ASCII_A)
-		// special case for absent, which marks a word break
-		if childTrie.atWordBoundary {
-			newWordList := make([]string, 0, len(currentWordList)+1)
-			newWordList = append(newWordList, currentWordList...)
-			newWordList = append(newWordList, currentWord)
-			recursiveFindTransposals(rootTrie, rootTrie, letterCounts, newWordList, string(index+ASCII_A), solutions)
-			continue
+		// special case for word breaks, which require us to recurse but we  don't want to return afterward
+		// because then we'd skip words. e.g., HAT and HATE. If this only checked word boundary, it would return
+		// before finding HATE
+		if index == len(currentTrie.children)-1 {
+			if currentTrie.atWordBoundary {
+				newWordList := make([]string, 0, len(currentWordList)+1)
+				newWordList = append(newWordList, currentWordList...)
+				newWordList = append(newWordList, currentWord)
+				recursiveFindTransposals(rootTrie, rootTrie, letterCounts, newWordList, "", solutions)
+			}
+			break
 		}
 
+		childLetter := string(index + ASCII_A)
 		_, hasCount := letterCounts[childLetter]
 		if hasCount {
-			recursiveFindTransposals(rootTrie, childTrie, decrementLetterCounts(childLetter, letterCounts), currentWordList, childLetter, solutions)
+			recursiveFindTransposals(rootTrie, childTrie, decrementLetterCounts(childLetter, letterCounts), currentWordList, currentWord+childLetter, solutions)
 		}
 	}
 }

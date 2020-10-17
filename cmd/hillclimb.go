@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -197,6 +198,7 @@ func calculateNgramFitness(deciphered string, trie *trieNode) float64 {
 }
 
 func populateNgramTrieFromReader(reader io.Reader, trie *trieNode) {
+	now := time.Now().UnixNano()
 	for scanner := bufio.NewScanner(reader); scanner.Scan(); {
 		line := scanner.Text()
 		fields := strings.Split(line, "\t")
@@ -212,6 +214,9 @@ func populateNgramTrieFromReader(reader io.Reader, trie *trieNode) {
 			fmt.Printf("Could not add %s to trie: %v\n", fields[0], err)
 			os.Exit(1)
 		}
+	}
+	if profile {
+		fmt.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano()-now)/float64(1000000))
 	}
 }
 

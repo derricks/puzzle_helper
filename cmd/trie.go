@@ -17,7 +17,7 @@ type trieNode struct {
 	value          interface{}
 	// each node's children is just a slice of childNodes. the position of each childNode represents its letter
 	// i.e., A= 0 and so on
-	children []*trieNode
+	children [27]*trieNode
 }
 
 func newTrie() *trieNode {
@@ -25,7 +25,11 @@ func newTrie() *trieNode {
 }
 
 func newTrieWithLetter(letter string) *trieNode {
-	return &trieNode{letter, false, nil, make([]*trieNode, 26, 26)}
+	var children [27]*trieNode
+	trie := &trieNode{letter, false, nil, children}
+	// a special character at the end so that transposals can check if they're at a word boundary _and_ traverse the children
+	trie.children[26] = &trieNode{"", false, nil, children}
+	return trie
 }
 
 var allUppercase = regexp.MustCompile("^[A-Z]+$")

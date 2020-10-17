@@ -167,6 +167,7 @@ func feedDictionaryReaders(feed chan string, readers ...*bufio.Reader) {
 // dictionaryChanToTrie will read the dictionary channel populated by feedDictionaryReaders
 // and will add the items to a Trie structure that it will return
 func readDictionaryToTrie(dictionary chan string) *trieNode {
+	now := time.Now().UnixNano()
 	newTrie := newTrie()
 	for entry := range dictionary {
 		// something needs to be the value or else nodes will get ignored in walks
@@ -174,6 +175,9 @@ func readDictionaryToTrie(dictionary chan string) *trieNode {
 		if err != nil {
 			fmt.Printf("Could not add %s to trie %v\n", entry, err)
 		}
+	}
+	if profile {
+		fmt.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano()-now)/float64(1000000))
 	}
 	return newTrie
 }

@@ -42,7 +42,7 @@ var memFile *os.File
 // enough of these commands use a dictionary file that we can declare it at the top level
 var dictionaryFile string
 
-var lettersRegex = regexp.MustCompile("[A-Za-z]")
+var lettersRegex = regexp.MustCompile("^[A-Za-z]+$")
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -170,7 +170,10 @@ func readDictionaryToTrie(dictionary chan string) *trieNode {
 	newTrie := newTrie()
 	for entry := range dictionary {
 		// something needs to be the value or else nodes will get ignored in walks
-		newTrie.addString(entry)
+		err := newTrie.addValueForString(entry, nil)
+		if err != nil {
+			fmt.Printf("Could not add %s to trie %v\n", entry, err)
+		}
 	}
 	return newTrie
 }

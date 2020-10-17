@@ -7,14 +7,21 @@ import (
 
 func TestAdds(test *testing.T) {
 	trie := newTrie()
-	trie.addString("hello")
 
-	childTrie, hPresent := trie.children["h"]
-	if !hPresent {
-		test.Errorf("h should have been present as a key but was not")
+	err := trie.addValueForString("hello", nil)
+	if err == nil {
+		test.Errorf("Trie should have rejected 'hello'")
 	}
 
-	if _, ePresent := childTrie.children["e"]; !ePresent {
+	trie.addValueForString("HELLO", nil)
+
+	childTrie := trie.children['H'-ASCII_A]
+	if childTrie == nil {
+		test.Errorf("H should have been present as a key but was not")
+	}
+
+	childTrie = childTrie.children['E'-ASCII_A]
+	if childTrie == nil {
 		test.Errorf("e should have been present within h but was not")
 	}
 }
@@ -27,14 +34,14 @@ type addRetrieveTest struct {
 
 func TestAddingRetrieving(test *testing.T) {
 	tests := []addRetrieveTest{
-		addRetrieveTest{"thirsty", 123, true},
-		addRetrieveTest{"thi", nil, true},
-		addRetrieveTest{"this", nil, false},
+		addRetrieveTest{"THIRSTY", 123, true},
+		addRetrieveTest{"THI", nil, true},
+		addRetrieveTest{"THIS", nil, false},
 	}
 	for index, testCase := range tests {
 		trie := newTrie()
 		if testCase.shouldBePresent {
-			trie.addStringWithValue(testCase.input, testCase.value)
+			trie.addValueForString(testCase.input, testCase.value)
 		}
 
 		value, stringWasPresent := trie.getValueForString(testCase.input)
@@ -50,10 +57,10 @@ func TestAddingRetrieving(test *testing.T) {
 
 func TestGetSize(test *testing.T) {
 	trie := newTrie()
-	trie.addString("hello")
-	trie.addString("hell")
-	trie.addString("he")
-	trie.addString("goodbye")
+	trie.addValueForString("HELLO", nil)
+	trie.addValueForString("HELL", nil)
+	trie.addValueForString("HE", nil)
+	trie.addValueForString("GOODBYE", nil)
 	actualSize := trie.getSize()
 	if actualSize != 4 {
 		test.Errorf("Expected trie size of 4 but got %d", actualSize)
@@ -62,13 +69,13 @@ func TestGetSize(test *testing.T) {
 
 func TestIterateWords(test *testing.T) {
 	tests := map[string]int{
-		"stringing": 123,
-		"string":    456,
+		"STRINGING": 123,
+		"STRING":    456,
 	}
 
 	trie := newTrie()
 	for testWord, testValue := range tests {
-		trie.addStringWithValue(testWord, testValue)
+		trie.addValueForString(testWord, testValue)
 	}
 
 	words := make(chan trieWord)

@@ -206,7 +206,12 @@ func populateNgramTrieFromReader(reader io.Reader, trie *trieNode) {
 			fmt.Printf("Invalid float in frequency file: %s\n", fields[1])
 			os.Exit(1)
 		}
-		trie.addStringWithValue(fields[0], frequency)
+
+		err = trie.addValueForString(fields[0], frequency)
+		if err != nil {
+			fmt.Printf("Could not add %s to trie: %v\n", fields[0], err)
+			os.Exit(1)
+		}
 	}
 }
 

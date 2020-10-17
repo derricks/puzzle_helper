@@ -95,11 +95,16 @@ func readNgramsIntoTrie(inReader io.Reader, ngramSize int) (*trieNode, int) {
 		}
 		totalNGrams += 1
 		currentNgram := scanner.Text()
-		currentCount, nGramPresent := trie.getValueForString(currentNgram)
-		if !nGramPresent {
-			trie.addStringWithValue(currentNgram, 1)
+		currentCount, isPresent := trie.getValueForString(currentNgram)
+		var err error
+		if isPresent {
+			err = trie.addValueForString(currentNgram, currentCount.(int)+1)
 		} else {
-			trie.setValueForString(currentNgram, currentCount.(int)+1)
+			err = trie.addValueForString(currentNgram, 1)
+		}
+		if err != nil {
+			fmt.Printf("Could not add %s to trie: %v\n", currentNgram, err)
+			os.Exit(1)
 		}
 	}
 	return trie, totalNGrams

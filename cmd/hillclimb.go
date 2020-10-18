@@ -50,9 +50,11 @@ var hillclimbCmd = &cobra.Command{
 	Run: hillClimbSubstitutionSolve,
 }
 
+var lettersInOrder = []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
+
 type substitutionHillclimbCandidate struct {
 	fitness float64
-	key     map[string]string
+	key     []string
 }
 
 type substitutionHillclimbCandidates []*substitutionHillclimbCandidate
@@ -62,22 +64,31 @@ func (h substitutionHillclimbCandidates) Len() int {
 }
 
 func (h substitutionHillclimbCandidates) Swap(i, j int) {
-	temp1 := h[i]
-	temp2 := h[j]
-	h[i] = temp2
-	h[j] = temp1
+	h[i], h[j] = h[j], h[i]
 }
 
 func (h substitutionHillclimbCandidates) Less(i, j int) bool {
-	left := h[i]
-	right := h[j]
-	return left.fitness > right.fitness
+	return h[i].fitness > h[j].fitness
 }
 
-func newHillclimbCandidate(key map[string]string, ciphertext string, frequencyMap map[string]float64) *substitutionHillclimbCandidate {
+func newHillclimbCandidate(key []string, ciphertext string, frequencyMap map[string]float64) *substitutionHillclimbCandidate {
 	plainText := decipherStringFromKey(ciphertext, key)
 	fitness := calculateNgramFitness(plainText, frequencyMap)
 	return &substitutionHillclimbCandidate{fitness, key}
+}
+
+func (c *substitutionHillclimbCandidate) String() string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("fitness: %.8f\n", c.fitness))
+
+	builder.WriteString(strings.Join(lettersInOrder, " "))
+	builder.WriteString("\n")
+	for _, plainLetter := range c.key {
+		builder.WriteString(plainLetter)
+		builder.WriteString(" ")
+	}
+	builder.WriteString("\n")
+	return builder.String()
 }
 
 func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
@@ -155,27 +166,22 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 	}
 
 	for _, candidate := range candidates {
-		fmt.Printf("%v\n%v\n%s\n\n", candidate.fitness, candidate.key, decipherStringFromKey(strings.ToUpper(rawInputText), candidate.key))
+		fmt.Printf("%v%s\n\n", candidate, decipherStringFromKey(strings.ToUpper(rawInputText), candidate.key))
 	}
 
 }
 
-// this unchanging slice just gives an O(1) way to look up a letter randomly in a key
-var randomKeyPool = []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
-
-func mutateKeyNTimes(n int, key map[string]string) map[string]string {
-	newKey := make(map[string]string)
-	for cipher, plain := range key {
-		newKey[cipher] = plain
+func mutateKeyNTimes(n int, plainLetters []string) []string {
+	// make a copy
+	newKey := make([]string, len(plainLetters), len(plainLetters))
+	for index, letter := range plainLetters {
+		newKey[index] = letter
 	}
 
 	for i := 0; i < n; i++ {
-		key1 := randomKeyPool[rand.Intn(len(randomKeyPool))]
-		key2 := randomKeyPool[rand.Intn(len(randomKeyPool))]
-		value1 := newKey[key1]
-		value2 := newKey[key2]
-		newKey[key2] = value1
-		newKey[key1] = value2
+		swap1 := rand.Intn(len(newKey))
+		swap2 := rand.Intn(len(newKey))
+		newKey[swap1], newKey[swap2] = newKey[swap2], newKey[swap1]
 	}
 	return newKey
 }
@@ -215,33 +221,25 @@ func populateFrequencyMapFromReader(reader io.Reader) map[string]float64 {
 	return result
 }
 
-// decipherStringFromKey decrypts cipherText with cipherToPlain
-func decipherStringFromKey(cipherText string, cipherToPlain map[string]string) string {
+// decipherStringFromKey decrypts cipherText by using the byte of the cipher letter as an index into plainLetters
+func decipherStringFromKey(cipherText string, plainLetters []string) string {
 	plainText := strings.Builder{}
-	cipherLetters := strings.Split(cipherText, "")
-	for _, currentCipherLetter := range cipherLetters {
-		plainLetter, isPresent := cipherToPlain[currentCipherLetter]
-		if isPresent {
-			plainText.WriteString(plainLetter)
-		} else {
+	for _, currentCipherLetter := range strings.Split(cipherText, "") {
+		curByte := []byte(currentCipherLetter)[0]
+		index := curByte - ASCII_A
+		if index < 0 || index > 25 {
 			plainText.WriteString(currentCipherLetter)
+		} else {
+			plainText.WriteString(plainLetters[index])
 		}
 	}
 	return plainText.String()
 }
 
-func generateRandomKey() map[string]string {
-	key := make(map[string]string)
-
-	cipherLetters := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
-	plainLetters := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
-	rand.Shuffle(len(cipherLetters), func(i, j int) { cipherLetters[i], cipherLetters[j] = cipherLetters[j], cipherLetters[i] })
-	rand.Shuffle(len(plainLetters), func(i, j int) { plainLetters[i], plainLetters[j] = plainLetters[j], plainLetters[i] })
-
-	for cipherIndex, letter := range cipherLetters {
-		key[letter] = plainLetters[cipherIndex]
-	}
-	return key
+func generateRandomKey() []string {
+	letters := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
+	rand.Shuffle(len(letters), func(i, j int) { letters[i], letters[j] = letters[j], letters[i] })
+	return letters
 }
 
 func init() {

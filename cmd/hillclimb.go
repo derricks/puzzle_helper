@@ -74,9 +74,9 @@ func (h substitutionHillclimbCandidates) Less(i, j int) bool {
 	return left.fitness > right.fitness
 }
 
-func newHillclimbCandidate(key map[string]string, ciphertext string, trie *trieNode) *substitutionHillclimbCandidate {
+func newHillclimbCandidate(key map[string]string, ciphertext string, frequencyMap map[string]float64) *substitutionHillclimbCandidate {
 	plainText := decipherStringFromKey(ciphertext, key)
-	fitness := calculateNgramFitness(plainText, trie)
+	fitness := calculateNgramFitness(plainText, frequencyMap)
 	return &substitutionHillclimbCandidate{fitness, key}
 }
 
@@ -91,8 +91,6 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 		justLetters = append(justLetters, letterScanner.Text())
 	}
 
-	trie := newTrie()
-
 	var inReader io.Reader
 	var err error
 	if ngramFrequencyFile == "-" {
@@ -105,11 +103,11 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	populateNgramTrieFromReader(inReader, trie)
+	frequencyMap := populateFrequencyMapFromReader(inReader)
 
 	justCipherText := strings.Join(justLetters, "")
 
-	currentCandidate := newHillclimbCandidate(generateRandomKey(), justCipherText, trie)
+	currentCandidate := newHillclimbCandidate(generateRandomKey(), justCipherText, frequencyMap)
 	bestOfGeneration := currentCandidate
 	candidates = append(candidates, bestOfGeneration)
 
@@ -137,7 +135,7 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 
 		// we've gone too long without finding a better fitness
 		if fitnessGenerations > regenAfter {
-			bestOfGeneration = newHillclimbCandidate(generateRandomKey(), justCipherText, trie)
+			bestOfGeneration = newHillclimbCandidate(generateRandomKey(), justCipherText, frequencyMap)
 			currentCandidate = bestOfGeneration
 			fitnessGenerations = 0
 			currentGeneration++
@@ -148,7 +146,7 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 		bestNewCandidate := currentCandidate
 		for localIndex := 0; localIndex < localLookaround; localIndex++ {
 
-			checkCandidate := newHillclimbCandidate(mutateKeyNTimes(mutations, currentCandidate.key), justCipherText, trie)
+			checkCandidate := newHillclimbCandidate(mutateKeyNTimes(mutations, currentCandidate.key), justCipherText, frequencyMap)
 			if checkCandidate.fitness > bestNewCandidate.fitness {
 				bestNewCandidate = checkCandidate
 			}
@@ -183,13 +181,13 @@ func mutateKeyNTimes(n int, key map[string]string) map[string]string {
 }
 
 // calculateNgramFitness takes in a deciphered string and calculates its fitness based on trie that maps ngrams to frequency
-func calculateNgramFitness(deciphered string, trie *trieNode) float64 {
+func calculateNgramFitness(deciphered string, frequencyMap map[string]float64) float64 {
 	var fitness float64
 	scanner := NewNgramScanner(strings.NewReader(deciphered), ngramSize)
 	for scanner.Scan() {
-		log10probability, isPresent := trie.getValueForString(scanner.Text())
+		log10probability, isPresent := frequencyMap[scanner.Text()]
 		if isPresent {
-			fitness += log10probability.(float64)
+			fitness += log10probability
 		} else {
 			fitness += -1000
 		}
@@ -197,7 +195,8 @@ func calculateNgramFitness(deciphered string, trie *trieNode) float64 {
 	return fitness
 }
 
-func populateNgramTrieFromReader(reader io.Reader, trie *trieNode) {
+func populateFrequencyMapFromReader(reader io.Reader) map[string]float64 {
+	result := make(map[string]float64)
 	now := time.Now().UnixNano()
 	for scanner := bufio.NewScanner(reader); scanner.Scan(); {
 		line := scanner.Text()
@@ -208,16 +207,12 @@ func populateNgramTrieFromReader(reader io.Reader, trie *trieNode) {
 			fmt.Printf("Invalid float in frequency file: %s\n", fields[1])
 			os.Exit(1)
 		}
-
-		err = trie.addValueForString(fields[0], frequency)
-		if err != nil {
-			fmt.Printf("Could not add %s to trie: %v\n", fields[0], err)
-			os.Exit(1)
-		}
+    result[fields[0]] = frequency
 	}
 	if profile {
-		fmt.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano()-now)/float64(1000000))
+		fmt.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano() - now)/float64(1000000))
 	}
+	return result
 }
 
 // decipherStringFromKey decrypts cipherText with cipherToPlain

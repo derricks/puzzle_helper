@@ -86,7 +86,7 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 
 	rawInputText := strings.Join(args, " ")
 	justLetters := make([]string, 0, len(rawInputText))
-	letterScanner := NewNgramScanner(strings.NewReader(rawInputText), 1)
+	letterScanner := NewNgramScanner(strings.NewReader(rawInputText), 1, false)
 	for letterScanner.Scan() {
 		justLetters = append(justLetters, letterScanner.Text())
 	}
@@ -183,7 +183,7 @@ func mutateKeyNTimes(n int, key map[string]string) map[string]string {
 // calculateNgramFitness takes in a deciphered string and calculates its fitness based on trie that maps ngrams to frequency
 func calculateNgramFitness(deciphered string, frequencyMap map[string]float64) float64 {
 	var fitness float64
-	scanner := NewNgramScanner(strings.NewReader(deciphered), ngramSize)
+	scanner := NewNgramScanner(strings.NewReader(deciphered), ngramSize, true)
 	for scanner.Scan() {
 		log10probability, isPresent := frequencyMap[scanner.Text()]
 		if isPresent {
@@ -207,10 +207,10 @@ func populateFrequencyMapFromReader(reader io.Reader) map[string]float64 {
 			fmt.Printf("Invalid float in frequency file: %s\n", fields[1])
 			os.Exit(1)
 		}
-    result[fields[0]] = frequency
+		result[fields[0]] = frequency
 	}
 	if profile {
-		fmt.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano() - now)/float64(1000000))
+		fmt.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano()-now)/float64(1000000))
 	}
 	return result
 }

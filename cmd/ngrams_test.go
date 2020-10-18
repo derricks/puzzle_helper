@@ -27,7 +27,7 @@ func TestNgramScanner(test *testing.T) {
 	for index, testCase := range tests {
 		reader := strings.NewReader(testCase.input)
 		actuals := make([]string, 0, len(testCase.expectedTokens))
-		scanner := NewNgramScanner(reader, testCase.ngramSize)
+		scanner := NewNgramScanner(reader, testCase.ngramSize, false)
 
 		for scanner.Scan() {
 			actuals = append(actuals, scanner.Text())

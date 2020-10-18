@@ -86,7 +86,7 @@ func outputNgrams(cmd *cobra.Command, args []string) {
 
 func readNgramsIntoTrie(inReader io.Reader, ngramSize int) (*trieNode, int) {
 	trie := newTrie()
-	scanner := NewNgramScanner(inReader, ngramSize)
+	scanner := NewNgramScanner(inReader, ngramSize, false)
 	totalNGrams := 0
 
 	for scanner.Scan() {
@@ -115,14 +115,15 @@ func readNgramsIntoTrie(inReader io.Reader, ngramSize int) (*trieNode, int) {
 // Example: "Hello, you" would generate "HELL", "ELLO", "LLOY", "LOYO", "OYOU"
 // it embeds a Scanner that it passes off most implementations to
 type ngramScanner struct {
-	ngramBuffer []byte
-	scanner     *bufio.Scanner
-	foundError  error
-	bufSize     int
+	ngramBuffer    []byte
+	scanner        *bufio.Scanner
+	foundError     error
+	bufSize        int
+	trustSafeInput bool
 }
 
-func NewNgramScanner(reader io.Reader, size int) *ngramScanner {
-	scanner := &ngramScanner{make([]byte, 0, size), bufio.NewScanner(reader), nil, size}
+func NewNgramScanner(reader io.Reader, size int, safeInput bool) *ngramScanner {
+	scanner := &ngramScanner{make([]byte, 0, size), bufio.NewScanner(reader), nil, size, safeInput}
 	scanner.scanner.Split(bufio.ScanBytes)
 	return scanner
 }
@@ -151,7 +152,8 @@ func (scanner *ngramScanner) Scan() bool {
 	}
 
 	// if the scanned bytes aren't letters, just keep going until they are
-	if !lettersRegex.Match(scanner.scanner.Bytes()) {
+	// if we've been told we can trust the input however, don't bother using the regex
+	if !scanner.trustSafeInput && !lettersRegex.Match(scanner.scanner.Bytes()) {
 		return scanner.Scan()
 	}
 
@@ -169,7 +171,7 @@ func (scanner *ngramScanner) Scan() bool {
 	// fill up the buffer the first time
 	for len(scanner.ngramBuffer) < scanner.bufSize {
 
-		if !lettersRegex.Match(scanner.scanner.Bytes()) {
+		if !scanner.trustSafeInput && !lettersRegex.Match(scanner.scanner.Bytes()) {
 			// keep ignoring non-letter characters
 			scanner.scanner.Scan()
 			continue

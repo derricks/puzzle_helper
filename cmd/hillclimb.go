@@ -224,6 +224,7 @@ func populateFrequencyMapFromReader(reader io.Reader) map[string]float64 {
 // decipherStringFromKey decrypts cipherText by using the byte of the cipher letter as an index into plainLetters
 func decipherStringFromKey(cipherText string, plainLetters []string) string {
 	plainText := strings.Builder{}
+	plainText.Grow(len(cipherText))
 	for _, currentCipherLetter := range strings.Split(cipherText, "") {
 		curByte := []byte(currentCipherLetter)[0]
 		index := curByte - ASCII_A

@@ -83,16 +83,6 @@ func init() {
 	cryptogramCmd.AddCommand(substitutionCmd)
 	cryptogramCmd.AddCommand(caesarCmd)
 	rootCmd.AddCommand(cryptogramCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// cryptogramCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// cryptogramCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 // printFrequencyTable generates output about the frequency of characters, digraphs, and trigraphs in a string

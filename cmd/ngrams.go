@@ -115,10 +115,10 @@ func readNgramsIntoTrie(inReader io.Reader, ngramSize int) (*trieNode, int) {
 // Example: "Hello, you" would generate "HELL", "ELLO", "LLOY", "LOYO", "OYOU"
 // it embeds a Scanner that it passes off most implementations to
 type ngramScanner struct {
-	ngramBuffer    []byte
-	scanner        *bufio.Scanner
-	foundError     error
-	bufSize        int
+	ngramBuffer []byte
+	scanner     *bufio.Scanner
+	foundError  error
+	bufSize     int
 	trustSafeInput bool
 }
 
@@ -216,14 +216,4 @@ func init() {
 	ngramsCmd.Flags().StringVarP(&outputFileName, "output", "o", "", "path for ngram frequency output file. defaults to stdout")
 	ngramsCmd.Flags().IntVarP(&ngramLength, "ngram-length", "n", 4, "the length of the ngrams to generate")
 	cryptogramCmd.AddCommand(ngramsCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// ngramsCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// ngramsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

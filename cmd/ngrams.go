@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -115,10 +115,10 @@ func readNgramsIntoTrie(inReader io.Reader, ngramSize int) (*trieNode, int) {
 // Example: "Hello, you" would generate "HELL", "ELLO", "LLOY", "LOYO", "OYOU"
 // it embeds a Scanner that it passes off most implementations to
 type ngramScanner struct {
-	ngramBuffer []byte
-	scanner     *bufio.Scanner
-	foundError  error
-	bufSize     int
+	ngramBuffer    []byte
+	scanner        *bufio.Scanner
+	foundError     error
+	bufSize        int
 	trustSafeInput bool
 }
 

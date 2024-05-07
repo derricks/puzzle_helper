@@ -32,10 +32,11 @@ const (
 // substitutionShell creates a loop which lets you interactively solve a substitution cipher.
 // It will prompt for commands and show the current state of cipher text and plain text.
 // Command reference:
-//   A=z will replace A in ciphertext with a z in plaintext
-//   cipher2Plain will list the cipher key in alphabetical order with the plain key underneath
-//   plain2Cipher will list the plain key in alphabetical order with the cipher key underneath
-//   clear will remove any mappings
+//
+//	A=z will replace A in ciphertext with a z in plaintext
+//	cipher2Plain will list the cipher key in alphabetical order with the plain key underneath
+//	plain2Cipher will list the plain key in alphabetical order with the cipher key underneath
+//	clear will remove any mappings
 func substitutionShell(cmd *cobra.Command, args []string) {
 	// whether to overwrite the text on the screen (will usually be true)
 	// or just push lines onto the screen

@@ -139,6 +139,15 @@ func (ii *IncrementerIncrementer[T]) GetCurrentValue() T {
 	return ii.incrementers[n-1].GetCurrentValue()
 }
 
+// GetAllIncrementerValues returns a map of incrementer names to their current values
+func (ii *IncrementerIncrementer[T]) GetAllIncrementerValues() map[string]T {
+	result := make(map[string]T)
+	for _, inc := range ii.incrementers {
+		result[inc.Name()] = inc.GetCurrentValue()
+	}
+	return result
+}
+
 // gologCmd represents the golog command
 var gologCmd = &cobra.Command{
 	Use:   "golog",

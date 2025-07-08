@@ -312,4 +312,32 @@ func TestIncrementerIncrementer_Behavior(t *testing.T) {
 	if got := combo.GetCurrentValue(); got != 1 {
 		t.Errorf("GetCurrentValue() = %v, want 1", got)
 	}
+}
+
+func TestIncrementerIncrementer_GetAllIncrementerValues(t *testing.T) {
+	inc1 := NewSliceIncrementer("ones", []int{0, 1})
+	inc2 := NewSliceIncrementer("twos", []int{0, 1, 2})
+	inc3 := NewSliceIncrementer("threes", []int{0, 1, 2})
+	combo := NewIncrementerIncrementer("combo", []Incrementer[int]{inc1, inc2, inc3})
+
+	// Initial state: all at 0
+	combo.Reset()
+	values := combo.GetAllIncrementerValues()
+	expected := map[string]int{"ones": 0, "twos": 0, "threes": 0}
+	for k, v := range expected {
+		if values[k] != v {
+			t.Errorf("GetAllIncrementerValues()[%q] = %v, want %v", k, values[k], v)
+		}
+	}
+
+	// Increment some incrementers
+	inc1.Increment() // ones: 1
+	inc2.Increment() // twos: 1
+	values = combo.GetAllIncrementerValues()
+	expected = map[string]int{"ones": 1, "twos": 1, "threes": 0}
+	for k, v := range expected {
+		if values[k] != v {
+			t.Errorf("After increment, GetAllIncrementerValues()[%q] = %v, want %v", k, values[k], v)
+		}
+	}
 } 

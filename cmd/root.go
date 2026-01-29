@@ -1,29 +1,18 @@
-/*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"regexp"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"time"
+
+	"encoding/json"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -41,6 +30,8 @@ var memFile *os.File
 
 // enough of these commands use a dictionary file that we can declare it at the top level
 var dictionaryFile string
+
+var outputFormat string
 
 var lettersRegex = regexp.MustCompile("^[A-Za-z]+$")
 
@@ -96,6 +87,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.puzzle_helper.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&profile, "profile", "", false, "turn on profiling for this run")
+	rootCmd.PersistentFlags().StringVarP(&outputFormat, "format", "F", "text", "output format (text or json)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -129,11 +121,11 @@ func initConfig() {
 	}
 }
 
-// feedDictionaryPaths takes a set of file paths (or - for stdin) and reads through
+// FeedDictionaryPaths takes a set of file paths (or - for stdin) and reads through
 // each one, feeding it to the channel. Many of the puzzle types this helps with need
 // to read from a dictionary file, so this creates a simple reusable pattern that
 // any solving functionality can use.
-func feedDictionaryPaths(feed chan string, files ...string) {
+func FeedDictionaryPaths(feed chan string, files ...string) {
 	readers := make([]*bufio.Reader, 0, len(files))
 	for _, file := range files {
 		if file == "-" {
@@ -148,13 +140,13 @@ func feedDictionaryPaths(feed chan string, files ...string) {
 			readers = append(readers, bufio.NewReader(file))
 		}
 	}
-	feedDictionaryReaders(feed, readers...)
+	FeedDictionaryReaders(feed, readers...)
 }
 
-// feedDictionaryReaders reads from readers and pushes strings to the feed,
+// FeedDictionaryReaders reads from readers and pushes strings to the feed,
 // closing it when it's done. This is separated out from above largely to
 // facilitate testing.
-func feedDictionaryReaders(feed chan string, readers ...*bufio.Reader) {
+func FeedDictionaryReaders(feed chan string, readers ...*bufio.Reader) {
 	for _, reader := range readers {
 		scanner := bufio.NewScanner(reader)
 		for scanner.Scan() {
@@ -164,9 +156,9 @@ func feedDictionaryReaders(feed chan string, readers ...*bufio.Reader) {
 	close(feed)
 }
 
-// dictionaryChanToTrie will read the dictionary channel populated by feedDictionaryReaders
+// ReadDictionaryToTrie will read the dictionary channel populated by FeedDictionaryReaders
 // and will add the items to a Trie structure that it will return
-func readDictionaryToTrie(dictionary chan string) *trieNode {
+func ReadDictionaryToTrie(dictionary chan string) *TrieNode {
 	now := time.Now().UnixNano()
 	newTrie := newTrie()
 	for entry := range dictionary {
@@ -180,4 +172,56 @@ func readDictionaryToTrie(dictionary chan string) *trieNode {
 		fmt.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano()-now)/float64(1000000))
 	}
 	return newTrie
+}
+
+// PopulateFrequencyMapFromReader reads from a reader and populates a frequency map.
+func PopulateFrequencyMapFromReader(reader io.Reader) (map[string]float64, int) {
+	result := make(map[string]float64)
+	scanner := bufio.NewScanner(reader)
+	var ngramSize int
+	for scanner.Scan() {
+		line := scanner.Text()
+		fields := strings.Split(line, "\t")
+		if len(fields) != 2 {
+			fmt.Printf("Invalid line in frequency file: %s\n", line)
+			os.Exit(1)
+		}
+		frequency, err := strconv.ParseFloat(fields[1], 64)
+		if err != nil {
+			fmt.Printf("Invalid float in frequency file: %s\n", fields[1])
+			os.Exit(1)
+		}
+		result[fields[0]] = frequency
+		if ngramSize == 0 { // Set ngramSize from the first entry
+			ngramSize = len(fields[0])
+		}
+	}
+	return result, ngramSize
+}
+
+func outputToStdout(output []interface{}) {
+	for _, line := range output {
+		fmt.Println(line)
+	}
+}
+
+func outputToJSON(output []interface{}) {
+	jsonOutput, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		fmt.Printf("Error marshalling to JSON: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println(string(jsonOutput))
+}
+
+func outputResponse(output []interface{}) {
+	switch outputFormat {
+	case "json":
+		outputToJSON(output)
+	case "text":
+		outputToStdout(output)
+	default:
+		fmt.Printf("Unknown output format: %s. Please use 'text' or 'json'.\n", outputFormat)
+		os.Exit(1)
+	}
 }

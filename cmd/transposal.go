@@ -1,18 +1,3 @@
-/*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
@@ -29,7 +14,78 @@ var maxWordLength int
 var maxNumberOfWords int
 var minNumberOfWords int
 
-// transposalCmd represents the transposal command
+// TransposalResult represents a single solution to a transposal puzzle.
+type TransposalResult struct {
+	Words []string `json:"words"`
+}
+
+// String implements fmt.Stringer for TransposalResult.
+func (tr TransposalResult) String() string {
+	return strings.Join(tr.Words, " ")
+}
+
+// PerformTransposalSolve finds transposals of the given ciphertext using the provided dictionary.
+func PerformTransposalSolve(
+	cipherText string,
+	dictionary *TrieNode,
+	minWordLen int,
+	maxWordLen int,
+	minNumWords int,
+	maxNumWords int,
+) []TransposalResult {
+	letterCounts := CreateLetterCountsMap(cipherText)
+	solutionChannel := make(chan []string)
+	done := make(chan struct{}) // Channel to signal when recursive calls are done
+
+	var results []TransposalResult
+
+	go func() {
+		for solution := range solutionChannel {
+			if len(solution) < minNumWords || len(solution) > maxNumWords {
+				continue
+			}
+
+			// check that word lengths are within bounds
+			isValid := true
+			for _, word := range solution {
+				if len(word) < minWordLen || len(word) > maxWordLen {
+					isValid = false
+					break
+				}
+			}
+			if isValid {
+				results = append(results, TransposalResult{Words: solution})
+			}
+		}
+		close(done) // Signal that we're done processing solutions
+	}()
+
+	// Start recursive search
+	for letter, _ := range letterCounts {
+		childIndex := []byte(letter)[0] - ASCII_A
+		if dictionary.children[childIndex] != nil {
+			RecursiveFindTransposals(
+				dictionary,
+				dictionary.children[childIndex],
+				DecrementLetterCounts(letter, letterCounts),
+				make([]string, 0),
+				letter,
+				solutionChannel,
+				minWordLen,
+				maxWordLen,
+				minNumWords,
+				maxNumWords,
+			)
+		}
+	}
+	close(solutionChannel) // Close the solutions channel when all recursive calls are initiated
+
+	<-done // Wait for all solutions to be processed
+
+	return results
+}
+
+// transposalCmdHandler represents the transposal command.
 var transposalCmd = &cobra.Command{
 	Use:   "transposal",
 	Short: "Finds transposals of the passed-in string",
@@ -40,41 +96,56 @@ var transposalCmd = &cobra.Command{
 		Lower word lengths or higher numbers of allowed strings will take longer
   `,
 	Args: cobra.MinimumNArgs(1),
-	Run:  findTransposals,
+	Run:  transposalCmdHandler,
 }
 
-// findTransposals joins the strings passed in args and hunts for any and all transposals
-// it can find in the dictionary file that was passed in
-func findTransposals(cmd *cobra.Command, args []string) {
+// transposalCmdHandler handles the cobra command for finding transposals.
+func transposalCmdHandler(cmd *cobra.Command, args []string) {
 	if dictionaryFile == "" {
 		fmt.Println("A dictionary file is required for finding transposals")
 		os.Exit(1)
 	}
-	// convert args to one long string. since it's a transposal, we can just smush them together
-	fullString := strings.ToUpper(strings.Join(args, ""))
-	results := make(chan string)
+
+	// Load dictionary for CLI mode
+	resultsChan := make(chan string)
 	go func() {
-		feedDictionaryPaths(results, dictionaryFile)
+		FeedDictionaryPaths(resultsChan, dictionaryFile)
 	}()
-	rootTrie := readDictionaryToTrie(results)
-	letterCounts := createLetterCountsMap(fullString)
-	solutions := make(chan []string)
-	go parseTransposals(solutions)
-	for letter, _ := range letterCounts {
-		childIndex := []byte(letter)[0] - ASCII_A
-		if rootTrie.children[childIndex] != nil {
-			recursiveFindTransposals(rootTrie, rootTrie.children[childIndex], decrementLetterCounts(letter, letterCounts), make([]string, 0), letter, solutions)
-		}
+	rootTrie := ReadDictionaryToTrie(resultsChan)
+
+	fullString := strings.ToUpper(strings.Join(args, ""))
+	transposalResults := PerformTransposalSolve(
+		fullString,
+		rootTrie,
+		minWordLength,
+		maxWordLength,
+		minNumberOfWords,
+		maxNumberOfWords,
+	)
+
+	var output []interface{}
+	for _, res := range transposalResults {
+		output = append(output, res)
 	}
-	close(solutions)
+	outputResponse(output)
 }
 
-// recursiveFindTransposals crawls tries and decrements letterCounts if childTrie is still a valid search path
-// results are written to the solutions channel
-func recursiveFindTransposals(rootTrie *trieNode, currentTrie *trieNode, letterCounts map[string]int, currentWordList []string, currentWord string, solutions chan []string) {
-	// we have no more letters and we're at a word break
-	if len(letterCounts) == 0 && (currentTrie.atWordBoundary) {
-		// make a copy to avoid messing with the slice
+// RecursiveFindTransposals crawls tries and decrements letterCounts if childTrie is still a valid search path.
+// Results are written to the solutions channel.
+func RecursiveFindTransposals(
+	rootTrie *TrieNode,
+	currentTrie *TrieNode,
+	letterCounts map[string]int,
+	currentWordList []string,
+	currentWord string,
+	solutions chan []string,
+	minWordLen int,
+	maxWordLen int,
+	minNumWords int,
+	maxNumWords int,
+) {
+	// We have no more letters and we're at a word break
+	if len(letterCounts) == 0 && currentTrie.atWordBoundary {
 		finalWordList := make([]string, 0, len(currentWordList)+1)
 		finalWordList = append(finalWordList, currentWordList...)
 		finalWordList = append(finalWordList, currentWord)
@@ -83,26 +154,28 @@ func recursiveFindTransposals(rootTrie *trieNode, currentTrie *trieNode, letterC
 	}
 
 	if len(letterCounts) == 0 {
-		// this means we've run out of letters
 		return
 	}
 
-	// this flow  ensures that we handle word breaks as well as continuations
-	// root could become to or or toro, so we need to handle the word break
-	// _and_ other children
+	// This flow ensures that we handle word breaks as well as continuations
 	for index, childTrie := range currentTrie.children {
 		if childTrie == nil {
 			continue
 		}
-		// special case for word breaks, which require us to recurse but we  don't want to return afterward
-		// because then we'd skip words. e.g., HAT and HATE. If this only checked word boundary, it would return
-		// before finding HATE
+		// Special case for word breaks
 		if index == len(currentTrie.children)-1 {
 			if currentTrie.atWordBoundary {
 				newWordList := make([]string, 0, len(currentWordList)+1)
 				newWordList = append(newWordList, currentWordList...)
 				newWordList = append(newWordList, currentWord)
-				recursiveFindTransposals(rootTrie, rootTrie, letterCounts, newWordList, "", solutions)
+
+				// Only recurse if we haven't exceeded maxNumberOfWords
+				if len(newWordList) <= maxNumWords {
+					RecursiveFindTransposals(
+						rootTrie, rootTrie, letterCounts, newWordList, "", solutions,
+						minWordLen, maxWordLen, minNumWords, maxNumWords,
+					)
+				}
 			}
 			break
 		}
@@ -110,14 +183,17 @@ func recursiveFindTransposals(rootTrie *trieNode, currentTrie *trieNode, letterC
 		childLetter := string(index + ASCII_A)
 		_, hasCount := letterCounts[childLetter]
 		if hasCount {
-			recursiveFindTransposals(rootTrie, childTrie, decrementLetterCounts(childLetter, letterCounts), currentWordList, currentWord+childLetter, solutions)
+			RecursiveFindTransposals(
+				rootTrie, childTrie, DecrementLetterCounts(childLetter, letterCounts), currentWordList, currentWord+childLetter, solutions,
+				minWordLen, maxWordLen, minNumWords, maxNumWords,
+			)
 		}
 	}
 }
 
-// decrementLetterCounts decrements the count of letter in currentCounts (and deletes the key if it's decremented to 0)
-// and returns a new letter count map
-func decrementLetterCounts(letter string, currentCounts map[string]int) map[string]int {
+// DecrementLetterCounts decrements the count of letter in currentCounts (and deletes the key if it's decremented to 0)
+// and returns a new letter count map.
+func DecrementLetterCounts(letter string, currentCounts map[string]int) map[string]int {
 	_, present := currentCounts[letter]
 	if !present {
 		return currentCounts
@@ -131,39 +207,14 @@ func decrementLetterCounts(letter string, currentCounts map[string]int) map[stri
 		}
 
 		if currentLetterCount > 1 {
-			// > 1 because we don't want to write 0s into the map. So if currentLetterCount will be
-			// decremented to 0 (i.e., it's 1), then skip it
 			result[currentLetter] = currentLetterCount - 1
 		}
-
-		// if currentCount is now 0, we don't add the letter, effectively deleting it
 	}
 	return result
 }
 
-// parseTransposals reads off a channel and prints out any results that are in accordance with the arguments specified by the user,
-// such as number of words and so forth
-func parseTransposals(solutions chan []string) {
-ChannelLoop:
-	for wordSet := range solutions {
-		if len(wordSet) < minNumberOfWords || len(wordSet) > maxNumberOfWords {
-			continue
-		}
-
-		// check that word lengths are within bounds
-		for _, word := range wordSet {
-			if len(word) < minWordLength || len(word) > maxWordLength {
-				continue ChannelLoop
-			}
-		}
-		fmt.Println(strings.Join(wordSet, " "))
-	}
-}
-
-// createLetterCountsMap takes in a string and returns a map of letter to count.
-// this can then be used when walking the trie to keep track of whether the path
-// we're on represents a transposal
-func createLetterCountsMap(input string) map[string]int {
+// CreateLetterCountsMap takes in a string and returns a map of letter to count.
+func CreateLetterCountsMap(input string) map[string]int {
 	counts := make(map[string]int)
 	letters := strings.Split(input, "")
 
@@ -186,9 +237,9 @@ func init() {
 	transposalCmd.Flags().StringVarP(&dictionaryFile, "dictionary", "d", "", "Dictionary file to use, or - to use stdin")
 	transposalCmd.MarkFlagRequired("dictionary")
 
-	transposalCmd.Flags().IntVarP(&minWordLength, "min-word-length", "", 0, "The minimum length a word in the transposal can be")
+	transposalCmd.Flags().IntVarP(&minWordLength, "min-word-length", "", 1, "The minimum length a word in the transposal can be")
 	transposalCmd.Flags().IntVarP(&maxWordLength, "max-word-length", "", math.MaxUint32, "The maximum length a word in the transposal can be")
-	transposalCmd.Flags().IntVarP(&minNumberOfWords, "min-words", "", 0, "The minimum number of words allowable in a solution")
+	transposalCmd.Flags().IntVarP(&minNumberOfWords, "min-words", "", 1, "The minimum number of words allowable in a solution")
 	transposalCmd.Flags().IntVarP(&maxNumberOfWords, "max-words", "", math.MaxUint32, "The maximum number of words allowable in a solution")
 	rootCmd.AddCommand(transposalCmd)
 }

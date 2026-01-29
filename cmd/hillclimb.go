@@ -1,30 +1,11 @@
-/*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"math/rand"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -37,95 +18,88 @@ var regenAfter int
 var candidateCount int
 var localLookaround int
 
-// hillclimbCmd represents the hillclimb command
-var hillclimbCmd = &cobra.Command{
-	Use:   "hillclimb",
-	Short: "Use hill climbing techniques to find a substitution cipher key that produces text that has the same frequencies as the given tetragrams",
-	Long: `Hill climbing works by randomly mutating a substitution cipher key and evaluating the resulting text until its tetragram frequency matches the passed-in file.
-
-	At each pass, the current key is used to decrypt the text. If it scores better than the previous key, it becomes the current key. The current key is mutated again and
-	checked against the previous key and so on. You can control the number of runs the code does, though it defaults to 1000. When the command reaches its final run,
-	the program will print out the deciphered text using the current key.
-  `,
-	Run: hillClimbSubstitutionSolve,
+// SubstitutionHillclimbCandidate represents a single candidate solution with its fitness and key.
+type SubstitutionHillclimbCandidate struct {
+	Fitness float64  `json:"fitness"`
+	Key     []string `json:"key"`
 }
 
-var lettersInOrder = []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
-
-type substitutionHillclimbCandidate struct {
-	fitness float64
-	key     []string
+// HillclimbResult represents a final result from the hillclimbing process.
+type HillclimbResult struct {
+	Candidate      *SubstitutionHillclimbCandidate `json:"candidate"`
+	DecipheredText string                          `json:"decipheredText"`
 }
 
-type substitutionHillclimbCandidates []*substitutionHillclimbCandidate
-
-func (h substitutionHillclimbCandidates) Len() int {
-	return len(h)
-}
-
-func (h substitutionHillclimbCandidates) Swap(i, j int) {
-	h[i], h[j] = h[j], h[i]
-}
-
-func (h substitutionHillclimbCandidates) Less(i, j int) bool {
-	return h[i].fitness > h[j].fitness
-}
-
-func newHillclimbCandidate(key []string, ciphertext string, frequencyMap map[string]float64) *substitutionHillclimbCandidate {
-	plainText := decipherStringFromKey(ciphertext, key)
-	fitness := calculateNgramFitness(plainText, frequencyMap)
-	return &substitutionHillclimbCandidate{fitness, key}
-}
-
-func (c *substitutionHillclimbCandidate) String() string {
+// String implements fmt.Stringer for HillclimbResult.
+func (hcr HillclimbResult) String() string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("fitness: %.8f\n", c.fitness))
+	builder.WriteString(hcr.Candidate.String())
+	builder.WriteString(fmt.Sprintf("Deciphered Text:\n%s\n", hcr.DecipheredText))
+	return builder.String()
+}
 
+// String implements fmt.Stringer for SubstitutionHillclimbCandidate.
+func (c *SubstitutionHillclimbCandidate) String() string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("Fitness: %.8f\n", c.Fitness))
+	builder.WriteString("Key:    ")
 	builder.WriteString(strings.Join(lettersInOrder, " "))
-	builder.WriteString("\n")
-	for _, plainLetter := range c.key {
-		builder.WriteString(plainLetter)
-		builder.WriteString(" ")
-	}
+	builder.WriteString("\nPlain:  ")
+	builder.WriteString(strings.Join(c.Key, " "))
 	builder.WriteString("\n")
 	return builder.String()
 }
 
-func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
+// SubstitutionHillclimbCandidates is a slice of SubstitutionHillclimbCandidate for sorting.
+type SubstitutionHillclimbCandidates []*SubstitutionHillclimbCandidate
 
-	candidates := substitutionHillclimbCandidates(make([]*substitutionHillclimbCandidate, 0, candidateCount))
+func (h SubstitutionHillclimbCandidates) Len() int {
+	return len(h)
+}
 
-	rawInputText := strings.Join(args, " ")
-	justLetters := make([]string, 0, len(rawInputText))
-	letterScanner := NewNgramScanner(strings.NewReader(rawInputText), 1, false)
+func (h SubstitutionHillclimbCandidates) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+}
+
+func (h SubstitutionHillclimbCandidates) Less(i, j int) bool {
+	return h[i].Fitness > h[j].Fitness
+}
+
+// NewHillclimbCandidate creates a new substitutionHillclimbCandidate.
+func NewHillclimbCandidate(key []string, ciphertext string, frequencyMap map[string]float64, ngramSize int) *SubstitutionHillclimbCandidate {
+	plainText := DecipherStringFromKey(ciphertext, key)
+	fitness := CalculateNgramFitness(plainText, frequencyMap, ngramSize)
+	return &SubstitutionHillclimbCandidate{fitness, key}
+}
+
+// PerformHillclimbSolve runs the hillclimbing algorithm to find substitution cipher keys.
+func PerformHillclimbSolve(
+	cipherText string,
+	frequencyMap map[string]float64,
+	generations int,
+	mutations int,
+	regenAfter int,
+	candidateCount int,
+	localLookaround int,
+	ngramSize int,
+) []HillclimbResult {
+	candidates := SubstitutionHillclimbCandidates(make([]*SubstitutionHillclimbCandidate, 0, candidateCount))
+
+	justLetters := make([]string, 0, len(cipherText))
+	letterScanner := NewNgramScanner(strings.NewReader(cipherText), 1, false)
 	for letterScanner.Scan() {
 		justLetters = append(justLetters, letterScanner.Text())
 	}
-
-	var inReader io.Reader
-	var err error
-	if ngramFrequencyFile == "-" {
-		inReader = os.Stdin
-	} else {
-		inReader, err = os.Open(ngramFrequencyFile)
-		if err != nil {
-			fmt.Printf("Error with tetragram file: %v", err)
-			os.Exit(1)
-		}
-	}
-
-	frequencyMap := populateFrequencyMapFromReader(inReader)
-
 	justCipherText := strings.Join(justLetters, "")
 
-	currentCandidate := newHillclimbCandidate(generateRandomKey(), justCipherText, frequencyMap)
+	currentCandidate := NewHillclimbCandidate(GenerateRandomKey(), justCipherText, frequencyMap, ngramSize)
 	bestOfGeneration := currentCandidate
 	candidates = append(candidates, bestOfGeneration)
 
 	fitnessGenerations := 1
 	currentGeneration := 1
 	for currentGeneration <= generations {
-		if currentCandidate.fitness > bestOfGeneration.fitness {
+		if currentCandidate.Fitness > bestOfGeneration.Fitness {
 			bestOfGeneration = currentCandidate
 			fitnessGenerations = 0
 
@@ -134,7 +108,7 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 				sort.Sort(candidates)
 			} else {
 				currentLastPlace := candidates[len(candidates)-1]
-				if bestOfGeneration.fitness > currentLastPlace.fitness {
+				if bestOfGeneration.Fitness > currentLastPlace.Fitness {
 					candidates[len(candidates)-1] = bestOfGeneration
 					sort.Sort(candidates)
 				}
@@ -146,7 +120,7 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 
 		// we've gone too long without finding a better fitness
 		if fitnessGenerations > regenAfter {
-			bestOfGeneration = newHillclimbCandidate(generateRandomKey(), justCipherText, frequencyMap)
+			bestOfGeneration = NewHillclimbCandidate(GenerateRandomKey(), justCipherText, frequencyMap, ngramSize)
 			currentCandidate = bestOfGeneration
 			fitnessGenerations = 0
 			currentGeneration++
@@ -157,21 +131,75 @@ func hillClimbSubstitutionSolve(cmd *cobra.Command, args []string) {
 		bestNewCandidate := currentCandidate
 		for localIndex := 0; localIndex < localLookaround; localIndex++ {
 
-			checkCandidate := newHillclimbCandidate(mutateKeyNTimes(mutations, currentCandidate.key), justCipherText, frequencyMap)
-			if checkCandidate.fitness > bestNewCandidate.fitness {
+			checkCandidate := NewHillclimbCandidate(MutateKeyNTimes(mutations, currentCandidate.Key), justCipherText, frequencyMap, ngramSize)
+			if checkCandidate.Fitness > bestNewCandidate.Fitness {
 				bestNewCandidate = checkCandidate
 			}
 		}
 		currentCandidate = bestNewCandidate
 	}
 
+	var results []HillclimbResult
 	for _, candidate := range candidates {
-		fmt.Printf("%v%s\n\n", candidate, decipherStringFromKey(strings.ToUpper(rawInputText), candidate.key))
+		results = append(results, HillclimbResult{
+			Candidate:      candidate,
+			DecipheredText: DecipherStringFromKey(strings.ToUpper(cipherText), candidate.Key),
+		})
 	}
-
+	return results
 }
 
-func mutateKeyNTimes(n int, plainLetters []string) []string {
+// hillclimbCmd represents the hillclimb command
+var hillclimbCmd = &cobra.Command{
+	Use:   "hillclimb",
+	Short: "Use hill climbing techniques to find a substitution cipher key that produces text that has the same frequencies as the given tetragrams",
+	Long: `Hill climbing works by randomly mutating a substitution cipher key and evaluating the resulting text until its tetragram frequency matches the passed-in file.
+
+	At each pass, the current key is used to decrypt the text. If it scores better than the previous key, it becomes the current key. The current key is mutated again and
+	checked against the previous key and so on. You can control the number of runs the code does, though it defaults to 1000. When the command reaches its final run,
+	the program will print out the deciphered text using the current key.
+  `,
+	Run: hillclimbCmdHandler,
+}
+
+// hillclimbCmdHandler handles the cobra command for hillclimb substitution solving.
+func hillclimbCmdHandler(cmd *cobra.Command, args []string) {
+	rawInputText := strings.Join(args, " ")
+	if ngramFrequencyFile == "" {
+		fmt.Println("An ngram frequency file is required for hillclimb solving")
+		os.Exit(1)
+	}
+
+	ngramReader, err := os.Open(ngramFrequencyFile)
+	if err != nil {
+		fmt.Printf("Error with ngram frequency file: %v\n", err)
+		os.Exit(1)
+	}
+	defer ngramReader.Close()
+	frequencyMap, ngramSize := PopulateFrequencyMapFromReader(ngramReader) // Use exported function
+
+	results := PerformHillclimbSolve(
+		rawInputText,
+		frequencyMap,
+		generations,
+		mutations,
+		regenAfter,
+		candidateCount,
+		localLookaround,
+		ngramSize,
+	)
+
+	var output []interface{}
+	for _, res := range results {
+		output = append(output, res)
+	}
+	outputResponse(output)
+}
+
+var lettersInOrder = []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
+
+// MutateKeyNTimes mutates the given key n times by swapping random letters.
+func MutateKeyNTimes(n int, plainLetters []string) []string {
 	// make a copy
 	newKey := make([]string, len(plainLetters), len(plainLetters))
 	for index, letter := range plainLetters {
@@ -186,8 +214,8 @@ func mutateKeyNTimes(n int, plainLetters []string) []string {
 	return newKey
 }
 
-// calculateNgramFitness takes in a deciphered string and calculates its fitness based on trie that maps ngrams to frequency
-func calculateNgramFitness(deciphered string, frequencyMap map[string]float64) float64 {
+// CalculateNgramFitness takes in a deciphered string and calculates its fitness based on a frequency map.
+func CalculateNgramFitness(deciphered string, frequencyMap map[string]float64, ngramSize int) float64 {
 	var fitness float64
 	scanner := NewNgramScanner(strings.NewReader(deciphered), ngramSize, true)
 	for scanner.Scan() {
@@ -201,28 +229,8 @@ func calculateNgramFitness(deciphered string, frequencyMap map[string]float64) f
 	return fitness
 }
 
-func populateFrequencyMapFromReader(reader io.Reader) map[string]float64 {
-	result := make(map[string]float64)
-	now := time.Now().UnixNano()
-	for scanner := bufio.NewScanner(reader); scanner.Scan(); {
-		line := scanner.Text()
-		fields := strings.Split(line, "\t")
-		ngramSize = len(fields[0])
-		frequency, err := strconv.ParseFloat(fields[1], 64)
-		if err != nil {
-			fmt.Printf("Invalid float in frequency file: %s\n", fields[1])
-			os.Exit(1)
-		}
-		result[fields[0]] = frequency
-	}
-	if profile {
-		fmt.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano()-now)/float64(1000000))
-	}
-	return result
-}
-
-// decipherStringFromKey decrypts cipherText by using the byte of the cipher letter as an index into plainLetters
-func decipherStringFromKey(cipherText string, plainLetters []string) string {
+// DecipherStringFromKey decrypts cipherText by using the byte of the cipher letter as an index into plainLetters.
+func DecipherStringFromKey(cipherText string, plainLetters []string) string {
 	plainText := strings.Builder{}
 	plainText.Grow(len(cipherText))
 	for _, currentCipherLetter := range strings.Split(cipherText, "") {
@@ -237,7 +245,8 @@ func decipherStringFromKey(cipherText string, plainLetters []string) string {
 	return plainText.String()
 }
 
-func generateRandomKey() []string {
+// GenerateRandomKey generates a random substitution key.
+func GenerateRandomKey() []string {
 	letters := []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
 	rand.Shuffle(len(letters), func(i, j int) { letters[i], letters[j] = letters[j], letters[i] })
 	return letters
@@ -251,5 +260,5 @@ func init() {
 	hillclimbCmd.Flags().IntVarP(&regenAfter, "regen-after", "r", 1000, "how long a fitness can survive before the program starts with a new random key")
 	hillclimbCmd.Flags().IntVarP(&candidateCount, "candidates", "c", 10, "the number of top performing candidates to display")
 	hillclimbCmd.Flags().IntVarP(&localLookaround, "local-lookaround", "l", 1, "when picking a new path, evaluate this many local candidates and choose the best of them")
-	substitutionCmd.AddCommand(hillclimbCmd)
+	rootCmd.AddCommand(hillclimbCmd)
 }

@@ -1,18 +1,3 @@
-/*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
@@ -23,7 +8,8 @@ import (
 )
 
 // cryptogramCmd represents the cryptogram command
-var concurrency int
+// 'concurrency' is now declared in cmd/substitution.go
+// 'substitutionCmd' is now declared in cmd/substitution.go
 
 var cryptogramCmd = &cobra.Command{
 	Use:   "cryptogram",
@@ -42,18 +28,15 @@ var freqCmd = &cobra.Command{
 	Run:   printFrequencyTable,
 }
 
-var substitutionCmd = &cobra.Command{
-	Use:   "substitution",
-	Short: "Tools for dealing with simple substitution ciphers",
-}
-
+// substitutionReplCmd is for the interactive substitution shell
 var substitutionReplCmd = &cobra.Command{
 	Use:   "repl",
 	Short: "Creates an interactive session for solving substitution ciphers",
 	Args:  cobra.MinimumNArgs(1),
-	Run:   substitutionShell,
+	Run:   substitutionShell, // This is still the interactive shell
 }
 
+// substitutionSolveCmd is for solving substitution ciphers non-interactively
 var substitutionSolveCmd = &cobra.Command{
 	Use:   "solve",
 	Short: "Uses a dictionary file to solve a string of (alpha only) words",
@@ -62,7 +45,7 @@ var substitutionSolveCmd = &cobra.Command{
 	use those hits to find sets of letter combinations that will allow the words to be solved into
 	words in the dictionary.
 	`,
-	Run: substitutionSolve,
+	Run: substitutionCmdHandler, // Now calls the handler from cmd/substitution.go
 }
 
 var caesarCmd = &cobra.Command{
@@ -73,14 +56,22 @@ var caesarCmd = &cobra.Command{
 }
 
 func init() {
+	// Reference substitutionCmd from cmd/substitution.go
 	substitutionCmd.AddCommand(substitutionReplCmd)
-	substitutionSolveCmd.Flags().StringVarP(&dictionaryFile, "dictionary", "d", "", "Dictionary file to use, or - to use stdin")
+
+	// Set flags for substitutionSolveCmd, which uses variables from cmd/substitution.go
+	// dictionaryFile and concurrency are now defined in cmd/substitution.go
+	substitutionSolveCmd.Flags().StringVarP(&substitutionDictionaryFile, "dictionary", "d", "", "Dictionary file to use, or - to use stdin")
 	substitutionSolveCmd.MarkFlagRequired("dictionary")
+	substitutionSolveCmd.Flags().StringVarP(&substitutionNgramFrequencyFile, "ngram-frequency-file", "n", "", "Ngram frequency file to use (e.g., tetragrams.txt)")
+	substitutionSolveCmd.MarkFlagRequired("ngram-frequency-file")
 	substitutionSolveCmd.Flags().IntVarP(&concurrency, "concurrency", "c", 10, "The maximum goroutines to create for solving. Defaults to 10.")
+
+
 	substitutionCmd.AddCommand(substitutionSolveCmd)
 
 	cryptogramCmd.AddCommand(freqCmd)
-	cryptogramCmd.AddCommand(substitutionCmd)
+	cryptogramCmd.AddCommand(substitutionCmd) // Add the substitutionCmd from cmd/substitution.go
 	cryptogramCmd.AddCommand(caesarCmd)
 	rootCmd.AddCommand(cryptogramCmd)
 }
@@ -102,7 +93,7 @@ func printFrequencyTable(cmd *cobra.Command, args []string) {
 func countTotalCharacters(toCount string) int {
 	var totalCount = 0
 	for _, curByte := range []byte(toCount) {
-		if isUppercaseAscii(curByte) {
+		if IsUppercaseAscii(curByte) { // Use exported helper
 			totalCount += 1
 		}
 	}
@@ -113,7 +104,7 @@ func countTotalCharacters(toCount string) int {
 func frequencyCountInString(toCount string) map[byte]int {
 	counts := make(map[byte]int)
 	for _, curByte := range []byte(toCount) {
-		if !isUppercaseAscii(curByte) {
+		if !IsUppercaseAscii(curByte) { // Use exported helper
 			continue
 		}
 
@@ -127,10 +118,7 @@ func frequencyCountInString(toCount string) map[byte]int {
 	return counts
 }
 
-func isUppercaseAscii(check byte) bool {
-	return check >= 65 && check < 91
-}
+// isUppercaseAscii and isLowercaseAscii are now exported from cmd/caesar.go
+// and are used by other cmd files.
 
-func isLowercaseAscii(check byte) bool {
-	return check >= 97 && check < 123
-}
+// No need to redeclare here.

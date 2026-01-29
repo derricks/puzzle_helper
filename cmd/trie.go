@@ -11,30 +11,30 @@ import (
 
 const ASCII_A = 65
 
-type trieNode struct {
+type TrieNode struct {
 	letter         string
 	atWordBoundary bool
 	value          interface{}
 	// each node's children is just a slice of childNodes. the position of each childNode represents its letter
 	// i.e., A= 0 and so on
-	children [27]*trieNode
+	children [27]*TrieNode
 }
 
-func newTrie() *trieNode {
+func newTrie() *TrieNode {
 	return newTrieWithLetter("")
 }
 
-func newTrieWithLetter(letter string) *trieNode {
-	var children [27]*trieNode
-	trie := &trieNode{letter, false, nil, children}
+func newTrieWithLetter(letter string) *TrieNode {
+	var children [27]*TrieNode
+	trie := &TrieNode{letter, false, nil, children}
 	// a special character at the end so that transposals can check if they're at a word boundary _and_ traverse the children
-	trie.children[26] = &trieNode{"", false, nil, children}
+	trie.children[26] = &TrieNode{"", false, nil, children}
 	return trie
 }
 
 var allUppercase = regexp.MustCompile("^[A-Z]+$")
 
-func (node *trieNode) addValueForString(input string, value interface{}) error {
+func (node *TrieNode) addValueForString(input string, value interface{}) error {
 
 	if !allUppercase.MatchString(input) {
 		return fmt.Errorf("This trie only accepts upper case. String %s is invalid", input)
@@ -56,20 +56,20 @@ func (node *trieNode) addValueForString(input string, value interface{}) error {
 	return nil
 }
 
-// getSize returns the number of items in the trie
-func (node *trieNode) getSize() int {
+// GetSize returns the number of items in the trie
+func (node *TrieNode) GetSize() int {
 	size := 0
-	wordChannel := make(chan trieWord)
-	go node.feedWordsToChannel(wordChannel)
+	wordChannel := make(chan TrieWord) // Renamed trieWord to TrieWord
+	go node.FeedWordsToChannel(wordChannel) // Renamed feedWordsToChannel to FeedWordsToChannel
 	for _ = range wordChannel {
 		size++
 	}
 	return size
 }
 
-// getValueForString retrieves the value set for the string. It does not assume
+// GetValueForString retrieves the value set for the string. It does not assume
 // the string is in the trie; it will return nil, false if the string wasn't there
-func (node *trieNode) getValueForString(input string) (interface{}, bool) {
+func (node *TrieNode) GetValueForString(input string) (interface{}, bool) {
 	currentNode := node
 
 	for _, curChar := range strings.Split(input, "") {
@@ -88,19 +88,19 @@ func (node *trieNode) getValueForString(input string) (interface{}, bool) {
 	}
 }
 
-type trieWord struct {
-	word  string
-	value interface{}
+type TrieWord struct { // Renamed trieWord to TrieWord
+	Word  string // Renamed word to Word
+	Value interface{}
 }
 
-func (node *trieNode) feedWordsToChannel(channel chan trieWord) {
+func (node *TrieNode) FeedWordsToChannel(channel chan TrieWord) { // Renamed feedWordsToChannel to FeedWordsToChannel
 	node.recursiveFindWords("", channel)
 	close(channel)
 }
 
-func (node *trieNode) recursiveFindWords(currentWord string, channel chan trieWord) {
+func (node *TrieNode) recursiveFindWords(currentWord string, channel chan TrieWord) { // Renamed trieWord to TrieWord
 	if node.atWordBoundary {
-		channel <- trieWord{currentWord, node.value}
+		channel <- TrieWord{currentWord, node.value} // Renamed trieWord to TrieWord
 	}
 
 	for index, currentNode := range node.children {
@@ -110,6 +110,6 @@ func (node *trieNode) recursiveFindWords(currentWord string, channel chan trieWo
 	}
 }
 
-func (node *trieNode) String() string {
+func (node *TrieNode) String() string {
 	return fmt.Sprintf("%s (%s): [%v]", node.letter, node.value, node.children)
 }

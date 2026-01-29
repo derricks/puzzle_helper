@@ -1,18 +1,3 @@
-/*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
@@ -72,11 +57,11 @@ func outputNgrams(cmd *cobra.Command, args []string) {
 	}
 
 	trie, totalCount := readNgramsIntoTrie(inReader, ngramLength)
-	triePairs := make(chan trieWord)
-	go trie.feedWordsToChannel(triePairs)
+	triePairs := make(chan TrieWord) // Corrected: trieWord to TrieWord
+	go trie.FeedWordsToChannel(triePairs) // Corrected: feedWordsToChannel to FeedWordsToChannel
 	for pair := range triePairs {
 
-		_, err := outWriter.Write([]byte(fmt.Sprintf("%s\t%.16f\n", pair.word, math.Log10(float64(pair.value.(int))/float64(totalCount)))))
+		_, err := outWriter.Write([]byte(fmt.Sprintf("%s\t%.16f\n", pair.Word, math.Log10(float64(pair.Value.(int))/float64(totalCount)))))// Corrected: pair.word to pair.Word and pair.value to pair.Value
 		if err != nil {
 			fmt.Printf("Could not write to file: %v\n", err)
 			os.Exit(1)
@@ -84,7 +69,7 @@ func outputNgrams(cmd *cobra.Command, args []string) {
 	}
 }
 
-func readNgramsIntoTrie(inReader io.Reader, ngramSize int) (*trieNode, int) {
+func readNgramsIntoTrie(inReader io.Reader, ngramSize int) (*TrieNode, int) {
 	trie := newTrie()
 	scanner := NewNgramScanner(inReader, ngramSize, false)
 	totalNGrams := 0
@@ -95,7 +80,7 @@ func readNgramsIntoTrie(inReader io.Reader, ngramSize int) (*trieNode, int) {
 		}
 		totalNGrams += 1
 		currentNgram := scanner.Text()
-		currentCount, isPresent := trie.getValueForString(currentNgram)
+		currentCount, isPresent := trie.GetValueForString(currentNgram) // Corrected: getValueForString to GetValueForString
 		var err error
 		if isPresent {
 			err = trie.addValueForString(currentNgram, currentCount.(int)+1)

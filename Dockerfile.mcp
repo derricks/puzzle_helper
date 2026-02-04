@@ -1,0 +1,18 @@
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go build -tags=mcp -o puzzle_helper_mcp ./mcp_main.go
+
+FROM alpine:latest
+
+WORKDIR /app
+
+COPY --from=builder /app/puzzle_helper_mcp .
+
+ENTRYPOINT ["./puzzle_helper_mcp"]

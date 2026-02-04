@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"os"
 	"regexp"
@@ -11,8 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"encoding/json"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -165,11 +165,11 @@ func ReadDictionaryToTrie(dictionary chan string) *TrieNode {
 		// something needs to be the value or else nodes will get ignored in walks
 		err := newTrie.addValueForString(entry, nil)
 		if err != nil {
-			fmt.Printf("Could not add %s to trie %v\n", entry, err)
+			log.Printf("Could not add %s to trie %v\n", entry, err)
 		}
 	}
 	if profile {
-		fmt.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano()-now)/float64(1000000))
+		log.Printf("Reading into trie took: %.8fms\n", float64(time.Now().UnixNano()-now)/float64(1000000))
 	}
 	return newTrie
 }

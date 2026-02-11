@@ -33,6 +33,25 @@ type CaesarShiftOutput struct {
 	ShiftedText string `json:"shiftedText" jsonschema:"The text shifted by this amount"`
 }
 
+// LetterBankInput defines the input for the letter bank tool.
+type LetterBankInput struct {
+	Text             string `json:"text" jsonschema:"The text to find letter bank matches for"`
+	MinWordLength    int    `json:"minWordLength,omitempty" jsonschema:"Minimum length of each word in the solution (default: 1)"`
+	MaxWordLength    int    `json:"maxWordLength,omitempty" jsonschema:"Maximum length of each word in the solution (default: unlimited)"`
+	MinNumberOfWords int    `json:"minNumberOfWords,omitempty" jsonschema:"Minimum number of words in the solution (default: 1)"`
+	MaxNumberOfWords int    `json:"maxNumberOfWords,omitempty" jsonschema:"Maximum number of words in the solution (default: unlimited)"`
+}
+
+// LetterBankOutput defines the output for the letter bank tool.
+type LetterBankOutput struct {
+	Solutions []LetterBankSolution `json:"solutions" jsonschema:"List of letter bank solutions found"`
+}
+
+// LetterBankSolution represents a single letter bank solution.
+type LetterBankSolution struct {
+	Words []string `json:"words" jsonschema:"The words that make up this letter bank solution"`
+}
+
 // TransposalInput defines the input for the transposal/anagram tool.
 type TransposalInput struct {
 	Text               string `json:"text" jsonschema:"The text to find transposals/anagrams for"`
@@ -159,6 +178,11 @@ func main() {
 			Name:        "transposal_solve",
 			Description: "Finds all anagrams/transposals of the input text using a dictionary. Can find multi-word solutions.",
 		}, server.handleTransposal)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name:        "letterbank_solve",
+			Description: "Finds all letter bank matches for the input text using a dictionary. A letter bank is a word or phrase that uses exactly the same set of unique letters as the input. Can find multi-word solutions.",
+		}, server.handleLetterBank)
 	}
 
 	// Add hillclimb tool if ngram map is loaded
@@ -292,6 +316,66 @@ func (s *PuzzleHelperServer) handleTransposal(ctx context.Context, req *mcp.Call
 		textBuilder.WriteString("No transposals found.\n")
 	} else {
 		textBuilder.WriteString(fmt.Sprintf("Found %d transposal(s):\n", len(output.Solutions)))
+		for i, sol := range output.Solutions {
+			textBuilder.WriteString(fmt.Sprintf("%d: %s\n", i+1, strings.Join(sol.Words, " ")))
+		}
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: textBuilder.String()},
+		},
+	}, output, nil
+}
+
+// handleLetterBank processes letter bank requests.
+func (s *PuzzleHelperServer) handleLetterBank(ctx context.Context, req *mcp.CallToolRequest, input LetterBankInput) (*mcp.CallToolResult, LetterBankOutput, error) {
+	if input.Text == "" {
+		return nil, LetterBankOutput{}, fmt.Errorf("text is required")
+	}
+
+	// Set defaults
+	minWordLen := input.MinWordLength
+	if minWordLen <= 0 {
+		minWordLen = 1
+	}
+	maxWordLen := input.MaxWordLength
+	if maxWordLen <= 0 {
+		maxWordLen = math.MaxInt32
+	}
+	minNumWords := input.MinNumberOfWords
+	if minNumWords <= 0 {
+		minNumWords = 1
+	}
+	maxNumWords := input.MaxNumberOfWords
+	if maxNumWords <= 0 {
+		maxNumWords = math.MaxInt32
+	}
+
+	results := cmd.PerformLetterBankSolve(
+		strings.ToUpper(input.Text),
+		s.dictionary,
+		minWordLen,
+		maxWordLen,
+		minNumWords,
+		maxNumWords,
+	)
+
+	output := LetterBankOutput{
+		Solutions: make([]LetterBankSolution, len(results)),
+	}
+	for i, r := range results {
+		output.Solutions[i] = LetterBankSolution{
+			Words: r.Words,
+		}
+	}
+
+	// Also return as text content for display
+	var textBuilder strings.Builder
+	if len(output.Solutions) == 0 {
+		textBuilder.WriteString("No letter bank matches found.\n")
+	} else {
+		textBuilder.WriteString(fmt.Sprintf("Found %d letter bank match(es):\n", len(output.Solutions)))
 		for i, sol := range output.Solutions {
 			textBuilder.WriteString(fmt.Sprintf("%d: %s\n", i+1, strings.Join(sol.Words, " ")))
 		}

@@ -61,6 +61,9 @@ func main() {
 	transposalService := mcp_server.NewTransposalService(dictionary)
 	http.HandleFunc("/transposal/solve", mcp_server.HandleTransposalSolve(transposalService))
 
+	letterBankService := mcp_server.NewLetterBankService(dictionary)
+	http.HandleFunc("/letterbank/solve", mcp_server.HandleLetterBankSolve(letterBankService))
+
 	substitutionService := mcp_server.NewSubstitutionService(dictionary, ngramFrequencyMap, detectedNgramSize)
 	http.HandleFunc("/substitution/solve", mcp_server.HandleSubstitutionSolve(substitutionService))
 

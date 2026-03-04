@@ -180,7 +180,7 @@ func RecursiveFindTransposals(
 			break
 		}
 
-		childLetter := string(index + ASCII_A)
+		childLetter := string(rune(index + ASCII_A))
 		_, hasCount := letterCounts[childLetter]
 		if hasCount {
 			RecursiveFindTransposals(

@@ -70,7 +70,7 @@ func TestReadNgramsIntoTrie(test *testing.T) {
 	}
 
 	for ngram, expectedCount := range expectedCounts {
-		actualCount, wasPresent := trie.getValueForString(ngram)
+		actualCount, wasPresent := trie.GetValueForString(ngram)
 		if !wasPresent {
 			test.Errorf("Expected ngram %s in trie, but it was absent", ngram)
 		}

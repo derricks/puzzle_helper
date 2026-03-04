@@ -129,7 +129,7 @@ func RecursiveFindLetterBanks(
 			break
 		}
 
-		childLetter := string(index + ASCII_A)
+		childLetter := string(rune(index + ASCII_A))
 		// Only follow children whose letter is in the source letter set
 		if !letterSet[childLetter] {
 			continue

@@ -15,8 +15,8 @@ func TestIsUppercaseAscii(test *testing.T) {
 	}
 
 	for toTest, expected := range expectedResults {
-		if isUppercaseAscii(toTest) != expected {
-			test.Errorf("Expected isUppercaseAscii(%c) to return %v but returned %v instead", toTest, expected, isUppercaseAscii(toTest))
+		if IsUppercaseAscii(toTest) != expected {
+			test.Errorf("Expected isUppercaseAscii(%c) to return %v but returned %v instead", toTest, expected, IsUppercaseAscii(toTest))
 		}
 	}
 }
@@ -31,8 +31,8 @@ func TestIsLowercaseAscii(test *testing.T) {
 	}
 
 	for toTest, expected := range expectedResults {
-		if isLowercaseAscii(toTest) != expected {
-			test.Errorf("Expected isLowercaseAscii(%c) to return %v but it returned %v", toTest, expected, isLowercaseAscii(toTest))
+		if IsLowercaseAscii(toTest) != expected {
+			test.Errorf("Expected isLowercaseAscii(%c) to return %v but it returned %v", toTest, expected, IsLowercaseAscii(toTest))
 		}
 	}
 }

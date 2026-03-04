@@ -14,7 +14,7 @@ func TestSubstitutionPattern(test *testing.T) {
 	}
 
 	for input, expected := range tests {
-		actual := substitutionPattern(input)
+		actual := SubstitutionPattern(input)
 		if expected != actual {
 			test.Errorf("Expected %v from input text %v but got %v", expected, input, actual)
 		}
@@ -22,25 +22,28 @@ func TestSubstitutionPattern(test *testing.T) {
 }
 
 func TestFindMatchesFromDictionary(test *testing.T) {
-	matchesData := []*substitutionWordMatches{
-		&substitutionWordMatches{"HELLO", "ABCCD", make([]string, 0, 2)},
-		&substitutionWordMatches{"CHEESES", "ABCCDCD", make([]string, 0, 2)},
+	matchesData := []*SubstitutionWordMatches{
+		&SubstitutionWordMatches{"HELLO", "ABCCD", make([]string, 0, 2)},
+		&SubstitutionWordMatches{"CHEESES", "ABCCDCD", make([]string, 0, 2)},
 	}
 
 	dictionary := "BLEED\nWHEESES\nBOLT\nBOSSY"
 	dictChannel := make(chan string)
 	go func() {
-		feedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(dictionary)))
+		FeedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(dictionary)))
 	}()
 
-	findMatchesFromDictionary(matchesData, dictChannel)
-
-	if len(matchesData[0].patternMatches) != 2 {
-		test.Errorf("Expected HELLO to have 2 matches, but it had %v", len(matchesData[0].patternMatches))
+	trie := ReadDictionaryToTrie(dictChannel)
+	for _, match := range matchesData {
+		FindMatchesInTrie(match, trie)
 	}
 
-	if len(matchesData[1].patternMatches) != 1 {
-		test.Errorf("Expected CHEESES to have 1 match, but it had %v", len(matchesData[1].patternMatches))
+	if len(matchesData[0].PatternMatches) != 2 {
+		test.Errorf("Expected HELLO to have 2 matches, but it had %v", len(matchesData[0].PatternMatches))
+	}
+
+	if len(matchesData[1].PatternMatches) != 1 {
+		test.Errorf("Expected CHEESES to have 1 match, but it had %v", len(matchesData[1].PatternMatches))
 	}
 }
 
@@ -59,7 +62,7 @@ func stringInSlice(seek string, stringSlice []string) bool {
 }
 
 func TestPartitionMatches(test *testing.T) {
-	data := &substitutionWordMatches{"HELLO", "ABCCD", []string{"YUCCA", "WATTS", "VROOM", "VILLA", "SWEET"}}
+	data := &SubstitutionWordMatches{"HELLO", "ABCCD", []string{"YUCCA", "WATTS", "VROOM", "VILLA", "SWEET"}}
 
 	tests := []partitionTest{
 		partitionTest{5, []string{"YUCCA"}},
@@ -68,22 +71,22 @@ func TestPartitionMatches(test *testing.T) {
 	}
 
 	for index, curTest := range tests {
-		partitioned := partitionMatches(curTest.count, data)
+		partitioned := PartitionMatches(curTest.count, data)
 
 		if len(partitioned) != curTest.count {
 			test.Errorf("Test case %v: expected %v partitions but got %v", index, curTest.count, len(partitioned))
 		}
 
 		// verify matches are what's expected
-		if len(partitioned[0].patternMatches) != len(curTest.expectedMatchesAtZero) {
+		if len(partitioned[0].PatternMatches) != len(curTest.expectedMatchesAtZero) {
 			test.Errorf("Test case %d: Expected partition 0 to have %d items but had %d",
-				index, len(curTest.expectedMatchesAtZero), len(partitioned[0].patternMatches))
+				index, len(curTest.expectedMatchesAtZero), len(partitioned[0].PatternMatches))
 		}
 
 		for _, expectToFind := range curTest.expectedMatchesAtZero {
-			if !stringInSlice(expectToFind, partitioned[0].patternMatches) {
+			if !stringInSlice(expectToFind, partitioned[0].PatternMatches) {
 				test.Errorf("Test case %d: Expected to find %s in %v but did not",
-					index, expectToFind, partitioned[0].patternMatches)
+					index, expectToFind, partitioned[0].PatternMatches)
 			}
 		}
 
@@ -97,7 +100,7 @@ func TestCopyByteMap(test *testing.T) {
 		'C': 'D',
 	}
 
-	copy := copyByteMap(source)
+	copy := CopyByteMap(source)
 
 	for key, value := range source {
 		copyValue, found := copy[key]
@@ -111,21 +114,24 @@ func TestCopyByteMap(test *testing.T) {
 }
 
 func TestCollectValidMaps(test *testing.T) {
-	matchesData := []*substitutionWordMatches{
+	matchesData := []*SubstitutionWordMatches{
 		// willing people some
-		&substitutionWordMatches{"BUXXUDR", "ABCCBDE", make([]string, 0, 2)},
-		&substitutionWordMatches{"CPICXP", "ABCADB", make([]string, 0, 2)},
-		&substitutionWordMatches{"TIZP", "ABCD", make([]string, 0, 2)},
+		&SubstitutionWordMatches{"BUXXUDR", "ABCCBDE", make([]string, 0, 2)},
+		&SubstitutionWordMatches{"CPICXP", "ABCADB", make([]string, 0, 2)},
+		&SubstitutionWordMatches{"TIZP", "ABCD", make([]string, 0, 2)},
 	}
 
 	resultsChannel := make(chan map[byte]byte, 1)
 	dictionary := "WILLING\nPEOPLE\nSOME"
 	dictChannel := make(chan string)
 	go func() {
-		feedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(dictionary)))
+		FeedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(dictionary)))
 	}()
-	findMatchesFromDictionary(matchesData, dictChannel)
-	collectValidMaps(matchesData, make(map[byte]byte), resultsChannel)
+	trie := ReadDictionaryToTrie(dictChannel)
+	for _, match := range matchesData {
+		FindMatchesInTrie(match, trie)
+	}
+	CollectValidMaps(matchesData, make(map[byte]byte), resultsChannel)
 	byteMap := <-resultsChannel
 	close(resultsChannel)
 
@@ -157,15 +163,18 @@ func TestCollectValidMaps(test *testing.T) {
 
 	for testDict, expectedLength := range testCases {
 		for _, match := range matchesData {
-			match.patternMatches = make([]string, 0, 2)
+			match.PatternMatches = make([]string, 0, 2)
 		}
 		resultsChannel := make(chan map[byte]byte)
 		dictChannel := make(chan string)
 		go func() {
-			feedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(testDict)))
+			FeedDictionaryReaders(dictChannel, bufio.NewReader(strings.NewReader(testDict)))
 		}()
-		findMatchesFromDictionary(matchesData, dictChannel)
-		go collectValidMaps(matchesData, make(map[byte]byte), resultsChannel)
+		trie := ReadDictionaryToTrie(dictChannel)
+		for _, match := range matchesData {
+			FindMatchesInTrie(match, trie)
+		}
+		go CollectValidMaps(matchesData, make(map[byte]byte), resultsChannel)
 
 		byteMaps := make([]map[byte]byte, 0, expectedLength)
 	Loop:

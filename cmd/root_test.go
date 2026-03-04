@@ -17,7 +17,7 @@ func TestFeedDictionaryReaders(test *testing.T) {
 
 	entryChannel := make(chan string)
 	go func() {
-		feedDictionaryReaders(entryChannel, dictionaries...)
+		FeedDictionaryReaders(entryChannel, dictionaries...)
 	}()
 
 	entries := make([]string, 0)

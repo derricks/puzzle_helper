@@ -22,7 +22,7 @@ func TestCreateLetterCountsMap(test *testing.T) {
 		"L": 1,
 	}
 
-	actual := createLetterCountsMap(input)
+	actual := CreateLetterCountsMap(input)
 
 	// verify that every letter in expected is in actual with the correct count
 	for testLetter, expectedCount := range expectedCounts {
@@ -54,7 +54,7 @@ func TestDecrementLetterCounts(test *testing.T) {
 		"N": 1,
 	}
 
-	newMap := decrementLetterCounts("T", input)
+	newMap := DecrementLetterCounts("T", input)
 	tCount := newMap["T"]
 	if tCount != 5 {
 		test.Errorf("T should have been 5 was %d", tCount)
@@ -65,7 +65,7 @@ func TestDecrementLetterCounts(test *testing.T) {
 		test.Errorf("N should have been unchanged after the decrement. Expected 1 got %d", nCount)
 	}
 
-	newMap = decrementLetterCounts("N", input)
+	newMap = DecrementLetterCounts("N", input)
 	if _, nPresent := newMap["N"]; nPresent {
 		test.Errorf("N should not have been present in map but is")
 	}

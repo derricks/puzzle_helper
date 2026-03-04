@@ -105,7 +105,7 @@ func (node *TrieNode) recursiveFindWords(currentWord string, channel chan TrieWo
 
 	for index, currentNode := range node.children {
 		if currentNode != nil {
-			currentNode.recursiveFindWords(currentWord+(string(index+ASCII_A)), channel)
+			currentNode.recursiveFindWords(currentWord+(string(rune(index+ASCII_A))), channel)
 		}
 	}
 }

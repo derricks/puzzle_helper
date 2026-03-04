@@ -19,7 +19,7 @@ func TestShiftByte(test *testing.T) {
 	}
 
 	for _, curTest := range tests {
-		shiftedByte := shiftByte(curTest.start, curTest.shiftAmount)
+		shiftedByte := ShiftByte(curTest.start, curTest.shiftAmount)
 		if shiftedByte != curTest.expected {
 			test.Errorf("Expected %c from shiftByte(%c, %d) but got %c",
 				curTest.expected, curTest.start, curTest.shiftAmount, shiftedByte)

@@ -44,7 +44,7 @@ func TestAddingRetrieving(test *testing.T) {
 			trie.addValueForString(testCase.input, testCase.value)
 		}
 
-		value, stringWasPresent := trie.getValueForString(testCase.input)
+		value, stringWasPresent := trie.GetValueForString(testCase.input)
 		if stringWasPresent != testCase.shouldBePresent {
 			test.Errorf("Test case %d: expected %v for string's presence, got %v", index, testCase.shouldBePresent, stringWasPresent)
 		}
@@ -61,7 +61,7 @@ func TestGetSize(test *testing.T) {
 	trie.addValueForString("HELL", nil)
 	trie.addValueForString("HE", nil)
 	trie.addValueForString("GOODBYE", nil)
-	actualSize := trie.getSize()
+	actualSize := trie.GetSize()
 	if actualSize != 4 {
 		test.Errorf("Expected trie size of 4 but got %d", actualSize)
 	}
@@ -78,21 +78,21 @@ func TestIterateWords(test *testing.T) {
 		trie.addValueForString(testWord, testValue)
 	}
 
-	words := make(chan trieWord)
+	words := make(chan TrieWord)
 	timer := time.NewTimer(1 * time.Second)
 
-	go trie.feedWordsToChannel(words)
+	go trie.FeedWordsToChannel(words)
 	select {
 	case foundTrieWord := <-words:
-		testCount, wasPresent := tests[foundTrieWord.word]
+		testCount, wasPresent := tests[foundTrieWord.Word]
 		if !wasPresent {
-			test.Errorf("Channel put out a word that's not in test case: %s", foundTrieWord.word)
+			test.Errorf("Channel put out a word that's not in test case: %s", foundTrieWord.Word)
 		}
 
-		if testCount != foundTrieWord.value {
-			test.Errorf("Expected count of %d for %s but got %d", testCount, foundTrieWord.word, foundTrieWord.value)
+		if testCount != foundTrieWord.Value {
+			test.Errorf("Expected count of %d for %s but got %d", testCount, foundTrieWord.Word, foundTrieWord.Value)
 		}
-		delete(tests, foundTrieWord.word)
+		delete(tests, foundTrieWord.Word)
 	case _ = <-timer.C:
 		if len(tests) != 0 {
 			test.Errorf("Tests should be empty but had %d items in it", len(tests))

@@ -339,6 +339,290 @@ func TestToIncrementerSingleValueRange(t *testing.T) {
 	}
 }
 
+// --- prime() DSL ---
+
+func TestLexerTokenizesPrimeCall(t *testing.T) {
+	l := newLexer("N = prime(10,999)")
+	expected := []token{
+		{kind: tokIdent, val: "N"},
+		{kind: tokEquals, val: "="},
+		{kind: tokIdent, val: "prime"},
+		{kind: tokLParen, val: "("},
+		{kind: tokInt, val: "10"},
+		{kind: tokComma, val: ","},
+		{kind: tokInt, val: "999"},
+		{kind: tokRParen, val: ")"},
+		{kind: tokEOF},
+	}
+	for _, want := range expected {
+		got := l.next()
+		if got.kind != want.kind || got.val != want.val {
+			t.Errorf("expected token %+v, got %+v", want, got)
+		}
+	}
+}
+
+func TestParsePrimeCallFirstElement(t *testing.T) {
+	node, err := Parse("N = prime(10, 999)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if node.List == nil || len(node.List.Elements) == 0 {
+		t.Fatal("expected non-empty element list from prime()")
+	}
+	// First prime >= 10 is 11.
+	if got := node.List.Elements[0].Value; got != 11 {
+		t.Errorf("expected first element 11, got %d", got)
+	}
+}
+
+func TestParsePrimeCallLastElement(t *testing.T) {
+	node, err := Parse("N = prime(10, 999)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	last := node.List.Elements[len(node.List.Elements)-1]
+	// Largest prime <= 999 is 997.
+	if got := last.Value; got != 997 {
+		t.Errorf("expected last element 997, got %d", got)
+	}
+}
+
+func TestParsePrimeCallElementCount(t *testing.T) {
+	node, err := Parse("N = prime(10, 999)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	// 168 primes up to 999; subtract {2,3,5,7} below 10 → 164.
+	if got := len(node.List.Elements); got != 164 {
+		t.Errorf("expected 164 primes in [10,999], got %d", got)
+	}
+}
+
+func TestParsePrimeCallRangeHasNoPrimes(t *testing.T) {
+	// 14..16 contains no primes (14=2×7, 15=3×5, 16=2^4).
+	node, err := Parse("N = prime(14, 16)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if got := len(node.List.Elements); got != 0 {
+		t.Errorf("expected 0 primes in [14,16], got %d", got)
+	}
+}
+
+func TestParsePrimeErrorUnknownFunction(t *testing.T) {
+	if _, err := Parse("N = fibonacci(1, 10)"); err == nil {
+		t.Error("expected error for unknown function, got nil")
+	}
+}
+
+func TestParsePrimeErrorMissingOpenParen(t *testing.T) {
+	if _, err := Parse("N = prime 10, 999)"); err == nil {
+		t.Error("expected error for missing '(', got nil")
+	}
+}
+
+func TestParsePrimeErrorMissingComma(t *testing.T) {
+	if _, err := Parse("N = prime(10 999)"); err == nil {
+		t.Error("expected error for missing ',' between prime() arguments, got nil")
+	}
+}
+
+func TestToIncrementerFromPrime(t *testing.T) {
+	node, err := Parse("N = prime(10, 20)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	inc := ToIncrementer(node)
+	if inc.Name() != "N" {
+		t.Errorf("expected Name=\"N\", got %q", inc.Name())
+	}
+	// Primes in [10,20]: 11, 13, 17, 19.
+	for _, want := range []int{11, 13, 17, 19} {
+		if got := inc.CurrentValue(); got != want {
+			t.Errorf("expected %d, got %d", want, got)
+		}
+		inc.Increment()
+	}
+	if !inc.IsMaxed() {
+		t.Error("expected IsMaxed() = true after cycling all primes in [10,20]")
+	}
+}
+
+func TestPrimeSieveCacheIsReused(t *testing.T) {
+	// Reset cache to a clean slate so this test is independent of run order.
+	sieveMu.Lock()
+	sieveCache = nil
+	sieveCacheMax = 0
+	sieveMu.Unlock()
+
+	primesInRange(10, 100)
+
+	sieveMu.Lock()
+	firstPtr := reflect.ValueOf(sieveCache).Pointer()
+	sieveMu.Unlock()
+
+	// Smaller upper bound: existing sieve covers it, no new allocation.
+	primesInRange(10, 50)
+
+	sieveMu.Lock()
+	secondPtr := reflect.ValueOf(sieveCache).Pointer()
+	sieveMu.Unlock()
+
+	if firstPtr != secondPtr {
+		t.Error("expected sieve cache to be reused for a smaller range, but a new allocation occurred")
+	}
+
+	// Larger upper bound: sieve must be rebuilt.
+	primesInRange(10, 200)
+
+	sieveMu.Lock()
+	thirdPtr := reflect.ValueOf(sieveCache).Pointer()
+	cachedMax := sieveCacheMax
+	sieveMu.Unlock()
+
+	if thirdPtr == firstPtr {
+		t.Error("expected sieve cache to be replaced for a larger range, but old allocation was kept")
+	}
+	if cachedMax != 200 {
+		t.Errorf("expected sieveCacheMax = 200 after expanding cache, got %d", cachedMax)
+	}
+}
+
+func TestSquareCacheIsReused(t *testing.T) {
+	// Reset cache to a clean slate so this test is independent of run order.
+	squareMu.Lock()
+	squareCache = nil
+	squareCacheMax = -1
+	squareCacheRoot = -1
+	squareMu.Unlock()
+
+	squaresInRange(0, 25)
+
+	squareMu.Lock()
+	lenAfterFirst := len(squareCache)
+	maxAfterFirst := squareCacheMax
+	squareMu.Unlock()
+
+	// Smaller upper bound: cache should not change.
+	squaresInRange(0, 16)
+
+	squareMu.Lock()
+	lenAfterSmaller := len(squareCache)
+	maxAfterSmaller := squareCacheMax
+	squareMu.Unlock()
+
+	if lenAfterSmaller != lenAfterFirst {
+		t.Errorf("expected cache length to stay %d for smaller range, got %d", lenAfterFirst, lenAfterSmaller)
+	}
+	if maxAfterSmaller != maxAfterFirst {
+		t.Errorf("expected squareCacheMax to stay %d for smaller range, got %d", maxAfterFirst, maxAfterSmaller)
+	}
+
+	// Larger upper bound: cache should be extended incrementally.
+	squaresInRange(0, 100)
+
+	squareMu.Lock()
+	lenAfterLarger := len(squareCache)
+	maxAfterLarger := squareCacheMax
+	squareMu.Unlock()
+
+	if lenAfterLarger <= lenAfterFirst {
+		t.Errorf("expected cache to grow beyond %d entries for larger range, got %d", lenAfterFirst, lenAfterLarger)
+	}
+	if maxAfterLarger != 100 {
+		t.Errorf("expected squareCacheMax = 100 after extending cache, got %d", maxAfterLarger)
+	}
+}
+
+// --- square() DSL ---
+
+func TestParseSqaureCallFirstElement(t *testing.T) {
+	node, err := Parse("N = square(10, 1000)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if node.List == nil || len(node.List.Elements) == 0 {
+		t.Fatal("expected non-empty element list from square()")
+	}
+	// First perfect square >= 10 is 16 (4²).
+	if got := node.List.Elements[0].Value; got != 16 {
+		t.Errorf("expected first element 16, got %d", got)
+	}
+}
+
+func TestParseSquareCallLastElement(t *testing.T) {
+	node, err := Parse("N = square(10, 1000)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	last := node.List.Elements[len(node.List.Elements)-1]
+	// Largest perfect square <= 1000 is 961 (31²).
+	if got := last.Value; got != 961 {
+		t.Errorf("expected last element 961, got %d", got)
+	}
+}
+
+func TestParseSquareCallElementCount(t *testing.T) {
+	node, err := Parse("N = square(10, 1000)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	// Squares in [10,1000]: 4²=16 through 31²=961 → 28 values.
+	if got := len(node.List.Elements); got != 28 {
+		t.Errorf("expected 28 squares in [10,1000], got %d", got)
+	}
+}
+
+func TestParseSquareCallBoundaryIsInclusive(t *testing.T) {
+	// 25 (5²) and 36 (6²) are both in [25, 36].
+	node, err := Parse("N = square(25, 36)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	wantVals := []int{25, 36}
+	if got := len(node.List.Elements); got != len(wantVals) {
+		t.Fatalf("expected %d elements, got %d", len(wantVals), got)
+	}
+	for i, want := range wantVals {
+		if got := node.List.Elements[i].Value; got != want {
+			t.Errorf("element[%d]: expected %d, got %d", i, want, got)
+		}
+	}
+}
+
+func TestParseSquareCallRangeHasNoSquares(t *testing.T) {
+	// 10..15 contains no perfect squares (9 and 16 are both outside).
+	node, err := Parse("N = square(10, 15)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if got := len(node.List.Elements); got != 0 {
+		t.Errorf("expected 0 squares in [10,15], got %d", got)
+	}
+}
+
+func TestToIncrementerFromSquare(t *testing.T) {
+	node, err := Parse("N = square(1, 25)")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	inc := ToIncrementer(node)
+	if inc.Name() != "N" {
+		t.Errorf("expected Name=\"N\", got %q", inc.Name())
+	}
+	// Perfect squares in [1,25]: 1, 4, 9, 16, 25.
+	for _, want := range []int{1, 4, 9, 16, 25} {
+		if got := inc.CurrentValue(); got != want {
+			t.Errorf("expected %d, got %d", want, got)
+		}
+		inc.Increment()
+	}
+	if !inc.IsMaxed() {
+		t.Error("expected IsMaxed() = true after cycling all squares in [1,25]")
+	}
+}
+
 // --- Integration: Parse → Odometer ---
 
 func TestParseIntoOdometer(t *testing.T) {

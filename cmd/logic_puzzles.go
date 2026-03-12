@@ -1,5 +1,10 @@
 package cmd
 
+import (
+	"cmp"
+	"fmt"
+)
+
 // Incrementer is a generic interface for types that track an incrementing value
 // with a defined maximum, supporting reset and current-value inspection.
 type Incrementer[T any] interface {
@@ -33,6 +38,7 @@ type Odometer[T any] struct {
 	name   string
 	names  []string
 	digits []Incrementer[T]
+	vars   map[string]T
 }
 
 func (o *Odometer[T]) Name() string { return o.name }
@@ -79,4 +85,83 @@ func (o *Odometer[T]) CurrentValue() []T {
 		values[i] = d.CurrentValue()
 	}
 	return values
+}
+
+// OdometerVars returns a name→value snapshot of an Odometer's current state.
+// The map is allocated once on the first call and reused on every subsequent
+// call, avoiding per-iteration heap allocations in solver loops.
+func OdometerVars[T any](o *Odometer[T]) map[string]T {
+	if o.vars == nil {
+		o.vars = make(map[string]T, len(o.digits))
+	}
+	for i, d := range o.digits {
+		o.vars[o.names[i]] = d.CurrentValue()
+	}
+	return o.vars
+}
+
+// ComparisonOp is the operator used in a binary Constraint.
+type ComparisonOp int
+
+const (
+	OpLT  ComparisonOp = iota // <
+	OpGT                      // >
+	OpLTE                     // <=
+	OpGTE                     // >=
+	OpEQ                      // ==
+	OpNEQ                     // !=
+)
+
+// Constraint is a binary ordering rule between two named Incrementer values.
+// T must be an ordered type (int, float64, string, etc.) so that all six
+// comparison operators are well-defined.
+// Left and Right are Incrementer names; Op is the comparison operator.
+type Constraint[T cmp.Ordered] struct {
+	Left  string
+	Op    ComparisonOp
+	Right string
+}
+
+// Check evaluates the constraint against a name→value snapshot. It returns an
+// error if either variable name is not present in vars.
+func (c Constraint[T]) Check(vars map[string]T) (bool, error) {
+	l, lok := vars[c.Left]
+	r, rok := vars[c.Right]
+	if !lok {
+		return false, fmt.Errorf("constraint references unknown variable %q", c.Left)
+	}
+	if !rok {
+		return false, fmt.Errorf("constraint references unknown variable %q", c.Right)
+	}
+	switch c.Op {
+	case OpLT:
+		return l < r, nil
+	case OpGT:
+		return l > r, nil
+	case OpLTE:
+		return l <= r, nil
+	case OpGTE:
+		return l >= r, nil
+	case OpEQ:
+		return l == r, nil
+	case OpNEQ:
+		return l != r, nil
+	default:
+		return false, nil
+	}
+}
+
+// CheckAll returns true only if every constraint in the slice is satisfied by
+// vars. It returns an error if any constraint references an unknown variable.
+func CheckAll[T cmp.Ordered](constraints []Constraint[T], vars map[string]T) (bool, error) {
+	for _, c := range constraints {
+		ok, err := c.Check(vars)
+		if err != nil {
+			return false, err
+		}
+		if !ok {
+			return false, nil
+		}
+	}
+	return true, nil
 }

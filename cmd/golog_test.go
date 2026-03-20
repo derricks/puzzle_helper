@@ -623,6 +623,94 @@ func TestToIncrementerFromSquare(t *testing.T) {
 	}
 }
 
+// --- ParseConstraint ---
+
+func TestLexerTokenizesDoubleEquals(t *testing.T) {
+	l := newLexer("N == O")
+	expected := []token{
+		{kind: tokIdent, val: "N"},
+		{kind: tokDoubleEquals, val: "=="},
+		{kind: tokIdent, val: "O"},
+		{kind: tokEOF},
+	}
+	for _, want := range expected {
+		got := l.next()
+		if got.kind != want.kind || got.val != want.val {
+			t.Errorf("expected token %+v, got %+v", want, got)
+		}
+	}
+}
+
+func TestLexerSingleEqualsStillWorks(t *testing.T) {
+	l := newLexer("N = 5")
+	expected := []token{
+		{kind: tokIdent, val: "N"},
+		{kind: tokEquals, val: "="},
+		{kind: tokInt, val: "5"},
+		{kind: tokEOF},
+	}
+	for _, want := range expected {
+		got := l.next()
+		if got.kind != want.kind || got.val != want.val {
+			t.Errorf("expected token %+v, got %+v", want, got)
+		}
+	}
+}
+
+func TestParseConstraintTwoIncrementers(t *testing.T) {
+	node, err := ParseConstraint("N == O")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if node.Left.Ident == nil || *node.Left.Ident != "N" {
+		t.Errorf("expected Left.Ident=\"N\", got %+v", node.Left)
+	}
+	if node.Op != OpEQ {
+		t.Errorf("expected Op=OpEQ, got %v", node.Op)
+	}
+	if node.Right.Ident == nil || *node.Right.Ident != "O" {
+		t.Errorf("expected Right.Ident=\"O\", got %+v", node.Right)
+	}
+}
+
+func TestParseConstraintIncrementersAgainstStringLiteral(t *testing.T) {
+	node, err := ParseConstraint(`N == "green"`)
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if node.Left.Ident == nil || *node.Left.Ident != "N" {
+		t.Errorf("expected Left.Ident=\"N\", got %+v", node.Left)
+	}
+	if node.Right.String == nil || *node.Right.String != "green" {
+		t.Errorf("expected Right.String=\"green\", got %+v", node.Right)
+	}
+}
+
+func TestParseConstraintIncrementersAgainstIntLiteral(t *testing.T) {
+	node, err := ParseConstraint("Score == 42")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if node.Left.Ident == nil || *node.Left.Ident != "Score" {
+		t.Errorf("expected Left.Ident=\"Score\", got %+v", node.Left)
+	}
+	if node.Right.Int == nil || *node.Right.Int != 42 {
+		t.Errorf("expected Right.Int=42, got %+v", node.Right)
+	}
+}
+
+func TestParseConstraintErrorMissingDoubleEquals(t *testing.T) {
+	if _, err := ParseConstraint("N = O"); err == nil {
+		t.Error("expected error for single '=' in constraint, got nil")
+	}
+}
+
+func TestParseConstraintErrorMissingRHS(t *testing.T) {
+	if _, err := ParseConstraint("N =="); err == nil {
+		t.Error("expected error for missing right-hand side, got nil")
+	}
+}
+
 // --- Integration: Parse → Odometer ---
 
 func TestParseIntoOdometer(t *testing.T) {

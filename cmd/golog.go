@@ -15,6 +15,7 @@ const (
 	tokEOF tokenKind = iota
 	tokIdent
 	tokEquals
+	tokDoubleEquals
 	tokLBracket
 	tokRBracket
 	tokInt
@@ -55,6 +56,10 @@ func (l *lexer) next() token {
 	ch := l.input[l.pos]
 	switch {
 	case ch == '=':
+		if l.pos+1 < len(l.input) && l.input[l.pos+1] == '=' {
+			l.pos += 2
+			return token{kind: tokDoubleEquals, val: "=="}
+		}
 		l.pos++
 		return token{kind: tokEquals, val: "="}
 	case ch == '[':
@@ -438,4 +443,66 @@ func ToIncrementer(node *AssignNode) *SliceIncrementer[int] {
 // Handles string scalars.
 func ToStringIncrementer(node *AssignNode) *SliceIncrementer[string] {
 	return &SliceIncrementer[string]{name: node.Name, values: []string{*node.Scalar.String}}
+}
+
+// ConstraintOperand is one side of a binary constraint expression.
+// Exactly one field is non-nil: Ident names another Incrementer, Int and
+// String hold literal values.
+type ConstraintOperand struct {
+	Ident  *string
+	Int    *int
+	String *string
+}
+
+// ConstraintNode is the AST node for a binary constraint: Left == Right.
+type ConstraintNode struct {
+	Left  ConstraintOperand
+	Op    ComparisonOp
+	Right ConstraintOperand
+}
+
+// parseConstraintOperand consumes an identifier, integer literal, or string
+// literal and returns it as a ConstraintOperand.
+func (p *parser) parseConstraintOperand() (ConstraintOperand, error) {
+	switch p.current.kind {
+	case tokIdent:
+		s := p.current.val
+		p.advance()
+		return ConstraintOperand{Ident: &s}, nil
+	case tokInt:
+		v, err := parseInt(p.current.val)
+		if err != nil {
+			return ConstraintOperand{}, err
+		}
+		p.advance()
+		return ConstraintOperand{Int: &v}, nil
+	case tokString:
+		s := p.current.val
+		p.advance()
+		return ConstraintOperand{String: &s}, nil
+	default:
+		return ConstraintOperand{}, fmt.Errorf("expected identifier or literal, got %q", p.current.val)
+	}
+}
+
+// parseConstraint parses "operand == operand" and returns a ConstraintNode.
+func (p *parser) parseConstraint() (*ConstraintNode, error) {
+	left, err := p.parseConstraintOperand()
+	if err != nil {
+		return nil, fmt.Errorf("expected left-hand side: %w", err)
+	}
+	if _, err := p.expect(tokDoubleEquals); err != nil {
+		return nil, fmt.Errorf("expected '==': %w", err)
+	}
+	right, err := p.parseConstraintOperand()
+	if err != nil {
+		return nil, fmt.Errorf("expected right-hand side: %w", err)
+	}
+	return &ConstraintNode{Left: left, Op: OpEQ, Right: right}, nil
+}
+
+// ParseConstraint parses a DSL constraint expression (e.g. "N == O" or
+// "N == \"green\"") and returns its AST.
+func ParseConstraint(input string) (*ConstraintNode, error) {
+	return newParser(input).parseConstraint()
 }
